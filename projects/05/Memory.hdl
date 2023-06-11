@@ -1,0 +1,79 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/05/Memory.hdl
+
+/**
+ * The complete address space of the Hack computer's memory,
+ * including RAM and memory-mapped I/O. 
+ * The chip facilitates read and write operations, as follows:
+ *     Read:  out(t) = Memory[address(t)](t)
+ *     Write: if load(t-1) then Memory[address(t-1)](t) = in(t-1)
+ * In words: the chip always outputs the value stored at the memory 
+ * location specified by address. If load==1, the in value is loaded 
+ * into the memory location specified by address. This value becomes 
+ * available through the out output from the next time step onward.
+ * Address space rules:
+ * Only the upper 16K+8K+1 words of the Memory chip are used. 
+ * Access to address>0x6000 is invalid. Access to any address in 
+ * the range 0x4000-0x5FFF results in accessing the screen memory 
+ * map. Access to address 0x6000 results in accessing the keyboard 
+ * memory map. The behavior in these addresses is described in the 
+ * Screen and Keyboard chip specifications given in the book.
+ */
+
+CHIP Memory {
+    IN in[16], load, address[15];
+    OUT out[16];
+
+    PARTS:
+    // Put your code here:
+
+    // // determine if memory is pointing to ram. if so, pass the correct input+load to the ram
+    // Not(in=address[14], out=r0);
+    // And(a=r0,b=load,out=loadram);
+    // RAM16K(in=in, load=loadram, address=address[0..13], out=ramout);
+    
+    // // determine if memory is pointing to the screen. If so, pass the correct input+load to the screen
+    // Not(in=address[13], out=s0);
+    // And(a=address[14],b=s0,out=s1);
+    // And(a=s1,b=load,out=loadscreen);
+    // Screen(in=in, load=loadscreen, address=address[0..12], out=screenout);
+
+    // // determine if memory is pointing to the keyboard
+    // And(a=address[13], b=address[14], out=kmsb);
+    // Or8Way(in=address[0..7], out=klsb07);
+    // Or8Way(in[0..4]=address[8..12], in[5]=klsb07, in[6..7]=false, out=klsb);
+    // Not(in=klsb, out=notklsb);
+    // And(a=kmsb, b=notklsb, out=viewkeyboard);
+    // Keyboard(out=keyboardout);
+
+    // // pass the correct output to out
+    // And(a=address[13], b=address[14], out=sel1);
+    // Mux(a=address[14], b=viewkeyboard, sel=sel1, out=sel0);
+    // Mux4Way16(a=ramout, b=screenout, c=false, d=keyboardout, sel[0]=sel0, sel[1]=sel1, out=out);
+
+
+
+    Or(a=address[14],b=address[13],out=oor);
+    Not(in=oor,out=ramout);
+    Xor(a=address[14],b=address[13],out=screenout);
+    And(a=address[14],b=address[13],out=kbout);
+ 
+    And(a=load,b=ramout,out=ramload);
+    And(a=load,b=screenout,out=screenload);
+
+    RAM16K(in=in,load=ramload,address=address[0..13],out=w1);
+    Screen(in=in,load=screenload,address=address[0..12],out=w2);
+    Keyboard(out=w3);
+    
+    Mux4Way16(a=w1,b=w2,c=w2,d=w3,sel=address[13..14],out=out);
+
+
+
+    // And(a=address[13], b=address[14], out=sel1);
+    // Mux(a=address[14], b=viewkeyboard, sel=sel1, out=sel0);
+    // Mux4Way16(a=ramout, b=screenout, c=false, d=keyboardout, sel[0]=sel0, sel[1]=sel1, out=out);
+
+
+}
