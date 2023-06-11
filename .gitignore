@@ -10,7 +10,11 @@
 # Don't ignore .hdl files
 !*.hdl
 
-projects/demo/*
-
 # Don't ignore .py files
 !*.py
+
+
+# specific folders to ignore
+projects/demo/
+
+tools/
