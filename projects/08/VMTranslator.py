@@ -439,72 +439,7 @@ def call(line:str) -> list[str]:
         f'({return_address})',
     ]
 
-# def return_() -> list[str]:
-#     """translate a return command into one or more asm lines"""
 
-#     return [
-#         # save the end frame: endFrame = LCL
-#         '@LCL',
-#         'D=M',
-#         '@endFrame',
-#         'M=D',
-#         # save the return address: retAddr = *(endFrame - 5)
-#         '@5',
-#         'D=D-A',
-#         'A=D',
-#         'D=M',
-#         '@retAddr',
-#         'M=D',
-#         # put the return value at the top of the caller's stack: *ARG = pop()
-#         *pop_D(),
-#         '@ARG',
-#         'A=M',
-#         'M=D',
-#         # restore SP of the caller: SP = ARG + 1
-#         '@ARG',
-#         'D=M+1',
-#         '@SP',
-#         'M=D',
-#         # restore THAT of the caller: THAT = *(endFrame - 1)
-#         '@endFrame',
-#         'D=M-1',
-#         'A=D',
-#         'D=M',
-#         '@THAT',
-#         'M=D',
-#         # restore THIS of the caller: THIS = *(endFrame - 2)
-#         '@endFrame',
-#         'D=M',
-#         '@2',
-#         'D=D-A',
-#         'A=D',
-#         'D=M',
-#         '@THIS',
-#         'M=D',
-#         # restore ARG of the caller: ARG = *(endFrame - 3)
-#         '@endFrame',
-#         'D=M',
-#         '@3',
-#         'D=D-A',
-#         'A=D',
-#         'D=M',
-#         '@ARG',
-#         'M=D',
-#         # restore LCL of the caller: LCL = *(endFrame - 4)
-#         '@endFrame',
-#         'D=M',
-#         '@4',
-#         'D=D-A',
-#         'A=D',
-#         'D=M',
-#         '@LCL',
-#         'M=D',
-#         # goto return address
-#         '@retAddr',
-#         'A=M',
-#         '0;JMP',
-#     ]
-# BROKEN: tried to make return_() more compact...
 def return_() -> list[str]:
     """translate a return command into one or more asm lines"""
 
