@@ -4,8 +4,13 @@
 # But don't ignore directories, so we can recurse into them
 !*/
 
-# Don't ignore .py files
-!*.py
-
 # Don't ignore .gitignore
 !.gitignore
+
+# Don't ignore .hdl files
+!*.hdl
+
+projects/demo/*
+
+# Don't ignore .py files
+!*.py
