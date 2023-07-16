@@ -13,6 +13,9 @@
 # Don't ignore .py files
 !*.py
 
+# TBD Don't ignore .jack files, but do ignore project files...
+# !*.jack
+
 
 # specific folders to ignore
 projects/demo/
