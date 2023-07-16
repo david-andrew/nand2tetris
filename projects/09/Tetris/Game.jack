@@ -1,0 +1,412 @@
+class Game {
+    field int score;
+
+    field int screen_width;
+    field int screen_height;
+    field int game_width;
+    field int game_height;
+    field int game_top;
+    field int game_left;
+    field int game_bottom;
+    field int game_right;
+
+    field int piece_type; //0=I, 1=J, 2=L, 3=O, 4=S, 5=T, 6=Z
+    field int rotation;   //0=North, 1=East, 2=South, 3=West
+    field int bbox_x;
+    field int bbox_y;
+    field int bbox_size;
+
+    field int block0_x;
+    field int block0_y;
+    field int block1_x;
+    field int block1_y;
+    field int block2_x;
+    field int block2_y;
+    field int block3_x;
+    field int block3_y;
+
+    field ind time_since_last_move;
+
+    constructor Game new() {
+        //TODO: any game state setup
+
+        let screen_width = 512;
+        let screen_height = 256;
+
+        //block size is 10 (9x9 with shared 1px border)
+        //game area is 10 blocks wide, 24 blocks tall
+        let game_width = 100;  //10*10;
+        let game_height = 240; //24*10;
+
+        let game_left = (screen_width - game_width) / 2;
+        let game_top = (screen_height - game_height) / 2;
+        let game_right = game_left + game_width;
+        let game_bottom = game_top + game_height;
+
+        // initialize the random number generator
+        do Random.init(42);
+
+        // create the first piece
+        do spawn_piece();
+
+        // initialize the timer
+        let time_since_last_move = 0;
+
+        do draw();
+        
+        return this;
+    }
+
+    method void dispose() {
+        //TODO: any memory cleanup
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    method void run() {
+        //main game loop
+        //every frame:
+        //- check input
+        //- if movement
+        //    1. reset timer
+        //    2. handle movement
+        //- if timer expired, move block down
+        //on move down, check if block is stopped
+        //- if stopped
+        //    1. lock block in place
+        //    2. check for cleared rows
+        //    3. move rows above down
+        //    4. spawn new block
+
+
+        var char key;
+        var char prev_key;
+        while (true) {
+            //draw the game
+            // do draw();
+            do draw_tetrimino();
+
+            let key = Keyboard.keyPressed();
+            if (~(key = prev_key) & ~(key = 0)) {
+                
+                // let time_since_last_move = 0;
+
+                //clear the current piece
+                do Screen.setColor(false);
+                do draw_tetrimino();
+                do Screen.setColor(true);
+
+                if (key = 65) { do rotate_ccw(); }  // A
+                if (key = 68) { do rotate_cw(); }   // D
+                if (key = 130) { do move_left(); }  // left arrow
+                if (key = 131) { do move_up(); }    // up arrow
+                if (key = 132) { do move_right(); } // right arrow
+                if (key = 133) { do move_down(); }  // down arrow
+
+                //DEBUG
+                if ((key = 87) | (key = 83)) {
+                    if (key = 87) { let piece_type = piece_type + 1; }
+                    if (key = 83) { let piece_type = piece_type - 1; }
+                    if (piece_type = 7) { let piece_type = 0; }
+                    if (piece_type = -1) { let piece_type = 6; }
+                    if (piece_type = 0) { let bbox_size = 4; do set_I(); }
+                    if (piece_type = 1) { let bbox_size = 3; do set_J(); }
+                    if (piece_type = 2) { let bbox_size = 3; do set_L(); }
+                    if (piece_type = 3) { let bbox_size = 3; do set_O(); }
+                    if (piece_type = 4) { let bbox_size = 3; do set_S(); }
+                    if (piece_type = 5) { let bbox_size = 3; do set_T(); }
+                    if (piece_type = 6) { let bbox_size = 3; do set_Z(); }
+                }
+
+
+                //draw the current piece
+                do draw_tetrimino();
+            }
+
+            let prev_key = key;
+
+            //update the timer
+        }
+
+        // unreachable
+        return;
+    }
+
+    method void spawn_piece() {
+        // spawn a new piece
+        // let piece_type = Random.next() % 7;
+        let piece_type = 0; //DEBUG set to I piece
+
+        // set up the bounding box for this piece
+        if (piece_type = 0) { // long piece has 4x4 bbox
+            let bbox_x = 3;
+            let bbox_y = 0;
+            let bbox_size = 4;
+        } else { // all other pieces have 3x3 bbox
+            let bbox_x = 4;
+            let bbox_y = 0;
+            let bbox_size = 3;
+        }
+
+        // set up the rotation for this piece
+        let rotation = 0;
+
+        if (piece_type = 0) { do set_I(); }
+        if (piece_type = 1) { do set_J(); }
+        if (piece_type = 2) { do set_L(); }
+        if (piece_type = 3) { do set_O(); }
+        if (piece_type = 4) { do set_S(); }
+        if (piece_type = 5) { do set_T(); }
+        if (piece_type = 6) { do set_Z(); }
+
+        return;
+    }
+
+    method void rotate_ccw() {
+        // rotate the current piece counter-clockwise
+        //TODO fancy super rotation system checks
+
+        var int tmp;
+
+        // square pieces don't rotate
+        if (piece_type = 3) { return; }
+
+        // ccw rotation is: x' = y, y' = bbox_size-x-1
+        let tmp = block0_x;
+        let block0_x = block0_y;
+        let block0_y = bbox_size-tmp-1;
+
+        let tmp = block1_x;
+        let block1_x = block1_y;
+        let block1_y = bbox_size-tmp-1;
+
+        let tmp = block2_x;
+        let block2_x = block2_y;
+        let block2_y = bbox_size-tmp-1;
+
+        let tmp = block3_x;
+        let block3_x = block3_y;
+        let block3_y = bbox_size-tmp-1;
+
+        return;
+    }
+
+    method void rotate_cw() {
+        // rotate the current piece clockwise
+        //TODO fancy super rotation system checks
+
+        var int tmp;
+
+        // square pieces don't rotate
+        if (piece_type = 3) { return; }
+
+        // cw rotation is: x' = bbox_size-y-1, y' = x
+        let tmp = block0_x;
+        let block0_x = bbox_size-block0_y-1;
+        let block0_y = tmp;
+
+        let tmp = block1_x;
+        let block1_x = bbox_size-block1_y-1;
+        let block1_y = tmp;
+
+        let tmp = block2_x;
+        let block2_x = bbox_size-block2_y-1;
+        let block2_y = tmp;
+
+        let tmp = block3_x;
+        let block3_x = bbox_size-block3_y-1;
+        let block3_y = tmp;
+
+        return;
+    }
+
+    method void move_left() {
+        // move the current piece left
+        //TODO check for collisions
+
+        let bbox_x = bbox_x - 1;
+
+        return;
+    }
+
+    method void move_right() {
+        // move the current piece right
+        //TODO check for collisions
+
+        let bbox_x = bbox_x + 1;
+
+        return;
+    }
+
+    method void move_up() {
+        // move the current piece up
+        //TODO check for collisions
+
+        let bbox_y = bbox_y - 1;
+
+        return;
+    }
+
+    method void move_down() {
+        // move the current piece down
+        //TODO check for collisions
+
+        let bbox_y = bbox_y + 1;
+
+        return;
+    }
+
+    method void set_I() {
+        // set the current block to an I piece (with default rotation)
+        let block0_x = 0;
+        let block1_x = 1;
+        let block2_x = 2;
+        let block3_x = 3;
+        let block0_y = 1;
+        let block1_y = 1;
+        let block2_y = 1;
+        let block3_y = 1;
+
+        return;
+    }
+
+    method void set_J() {
+        // set the current block to a J piece (with default rotation)
+        let block0_x = 0;
+        let block1_x = 0;
+        let block2_x = 1;
+        let block3_x = 2;
+        let block0_y = 0;
+        let block1_y = 1;
+        let block2_y = 1;
+        let block3_y = 1;
+
+        return;
+    }
+
+    method void set_L() {
+        // set the current block to an L piece (with default rotation)
+        let block0_x = 0;
+        let block1_x = 1;
+        let block2_x = 2;
+        let block3_x = 2;
+        let block0_y = 1;
+        let block1_y = 1;
+        let block2_y = 1;
+        let block3_y = 0;
+
+        return;
+    }
+
+    method void set_O() {
+        // set the current block to an O piece (with default rotation)
+        let block0_x = 1;
+        let block1_x = 2;
+        let block2_x = 1;
+        let block3_x = 2;
+        let block0_y = 0;
+        let block1_y = 0;
+        let block2_y = 1;
+        let block3_y = 1;
+
+        return;
+    }
+
+    method void set_S() {
+        // set the current block to an S piece (with default rotation)
+        let block0_x = 0;
+        let block1_x = 1;
+        let block2_x = 1;
+        let block3_x = 2;
+        let block0_y = 1;
+        let block1_y = 1;
+        let block2_y = 0;
+        let block3_y = 0;
+
+        return;
+    }
+
+    method void set_T() {
+        // set the current block to a T piece (with default rotation)
+        let block0_x = 1;
+        let block1_x = 0;
+        let block2_x = 1;
+        let block3_x = 2;
+        let block0_y = 0;
+        let block1_y = 1;
+        let block2_y = 1;
+        let block3_y = 1;
+
+        return;
+    }
+
+    method void set_Z() {
+        // set the current block to a Z piece (with default rotation)
+        let block0_x = 0;
+        let block1_x = 1;
+        let block2_x = 1;
+        let block3_x = 2;
+        let block0_y = 0;
+        let block1_y = 0;
+        let block2_y = 1;
+        let block3_y = 1;
+
+        return;
+    }
+
+
+
+
+    method void draw() {
+        do Screen.clearScreen();
+        do Screen.setColor(true);
+
+        //Draw an outline around the play area 
+        do draw_outline(game_left, game_top, game_right, game_bottom);
+        
+        do draw_score();
+
+        return;
+    }
+
+    method void draw_outline(int x1, int y1, int x2, int y2) {
+        // draw a 1 pixel border around the specified rectangle
+        do Screen.drawRectangle(x1-1, y1-1, x2+1, y2+1);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x1, y1, x2, y2);
+        do Screen.setColor(true);
+        return;
+    }
+
+    method void draw_score() {
+        do Output.moveCursor(1, 1);
+        do Output.printString("Score: ");
+        do Output.printInt(score);
+        return;
+    }
+
+    method void draw_block(int x, int y) {
+        // draw a tetrino block at the specified game coordinates
+        // game coordinates are from the top left corner of the play area
+        // block size is 10 (9x9 with shared 1px border)
+        var int x1, y1, x2, y2;
+        let x1 = game_left + 1 + (x*10);
+        let y1 = game_top + 1 + (y*10);
+        let x2 = x1 + 8;
+        let y2 = y1 + 8;
+
+        do Screen.drawRectangle(x1, y1, x2, y2);
+        return;
+    }
+
+    method void draw_tetrimino() {
+        // draw the current piece
+
+        do draw_block(bbox_x + block0_x, bbox_y + block0_y);
+        do draw_block(bbox_x + block1_x, bbox_y + block1_y);
+        do draw_block(bbox_x + block2_x, bbox_y + block2_y);
+        do draw_block(bbox_x + block3_x, bbox_y + block3_y);
+
+        return;
+    }
+}

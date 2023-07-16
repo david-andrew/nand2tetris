@@ -1,0 +1,17 @@
+class Random {
+    static int seed;
+    
+    function void init(int initSeed) {
+        let seed = initSeed;
+        return;
+    }
+    
+    function int next() {
+        // simple linear congruential generator: seed = (seed * 25173 + 13849) % 32768;
+        let seed = (seed * 25173) + 13849;
+
+        // Don't need to take the modulus because integers are 0-32767 already
+        
+        return seed;
+    }
+}
