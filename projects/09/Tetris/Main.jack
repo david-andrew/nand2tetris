@@ -9,7 +9,7 @@ class Main {
         // do game.draw();
         // do game.spawn_piece();
         // do game.draw_piece();
-        do game.run();
+        do game.play();
         do game.dispose();
         return;
     }
