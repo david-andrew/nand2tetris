@@ -106,7 +106,7 @@ class Game {
 
         //print game over message in center of the screen
         do Output.moveCursor(10, 10);
-        do Output.printString("Game Over!");
+        do Output.printString("GAME OVER!");
 
         return;
     }
