@@ -81,7 +81,7 @@ class Game {
         }
 
         // initialize the timer
-        let frame_length = 500; // iterations per frame
+        let frame_length = 8000; // iterations per frame
 
         do draw();
         
@@ -222,20 +222,8 @@ class Game {
     }
 
     method void drop_piece() {
-        //main game loop
-        //every frame:
-        //- check input
-        //- if movement
-        //    1. reset timer
-        //    2. handle movement
-        //- if timer expired, move block down
-        //on move down, check if block is stopped
-        //- if stopped
-        //    1. lock block in place
-        //    2. check for cleared rows
-        //    3. move rows above down
-        //    4. spawn new block
-        
+        // drop the current piece until it hits the bottom
+
         var char key;
         var char prev_key;
         var boolean pressed_key;
@@ -247,42 +235,42 @@ class Game {
             let pressed_key = false;
 
             //draw the game
-            // do draw();
-            do draw_tetrimino();
+            // do draw_tetrimino();
 
             let key = Keyboard.keyPressed();
             if (~(key = prev_key) & ~(key = 0)) {
                 let pressed_key = true;
                 let time_since_last_move = 0;
-                // let time_since_last_move = 0;
 
                 //clear the current piece
-                do Screen.setColor(false);
-                do draw_tetrimino();
-                do Screen.setColor(true);
+                // do Screen.setColor(false);
+                // do draw_tetrimino();
+                // do Screen.setColor(true);
 
-                // do reset_move_to_candidate();
+                // DEBUG controls
                 // if (key = 65)  { do rotate_ccw(); }  // A
                 // if (key = 68)  { do rotate_cw(); }   // D
                 // if (key = 133) { do move_down(); }  // down arrow
                 // if (key = 131) { do move_up(); }    // up arrow
+                
+                // actual controls
                 if (key = 132) { do move_right(); } // right arrow
                 if (key = 130) { do move_left(); }  // left arrow
                 if (key = 133) { do rotate_cw(); }  // down arrow
                 if (key = 131) { do rotate_ccw(); } // up arrow
 
-                //DEBUG change to a different piece
-                if ((key = 87) | (key = 83)) {
-                    if (key = 87) { let piece_type = mod(piece_type + 1, 7); }
-                    if (key = 83) { let piece_type = mod(piece_type - 1, 7); }
-                    if (piece_type = 0) { let bbox_size = 4; do set_I(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                    if (piece_type = 1) { let bbox_size = 3; do set_J(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                    if (piece_type = 2) { let bbox_size = 3; do set_L(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                    if (piece_type = 3) { let bbox_size = 3; do set_O(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                    if (piece_type = 4) { let bbox_size = 3; do set_S(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                    if (piece_type = 5) { let bbox_size = 3; do set_T(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                    if (piece_type = 6) { let bbox_size = 3; do set_Z(); if (can_move_to_candidate()) { do move_to_candidate(); } }
-                }
+                // //DEBUG change to a different piece
+                // if ((key = 87) | (key = 83)) {
+                //     if (key = 87) { let piece_type = mod(piece_type + 1, 7); }
+                //     if (key = 83) { let piece_type = mod(piece_type - 1, 7); }
+                //     if (piece_type = 0) { let bbox_size = 4; do set_I(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                //     if (piece_type = 1) { let bbox_size = 3; do set_J(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                //     if (piece_type = 2) { let bbox_size = 3; do set_L(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                //     if (piece_type = 3) { let bbox_size = 3; do set_O(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                //     if (piece_type = 4) { let bbox_size = 3; do set_S(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                //     if (piece_type = 5) { let bbox_size = 3; do set_T(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                //     if (piece_type = 6) { let bbox_size = 3; do set_Z(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                // }
 
 
             }
@@ -296,8 +284,8 @@ class Game {
                     do set_board(piece_y + block2_y, piece_x + block2_x, true);
                     do set_board(piece_y + block3_y, piece_x + block3_x, true);
 
-                    //check for cleared rows
-                    do clear_rows();
+                    let score = score + 10;
+                    do draw_score();
 
                     return;
                 }
@@ -305,7 +293,7 @@ class Game {
 
 
             //draw the current piece
-            do draw_tetrimino();
+            // do draw_tetrimino();
 
             //update prev key, and timer
             let prev_key = key;
@@ -318,9 +306,81 @@ class Game {
     }
 
     method void clear_rows() {
-        //TODO
+        var int i;
+        var int j;
+        var boolean row_filled;
+        var int rows_cleared;
+
+        let rows_cleared = 0;
+        let i = board_height - 1;
+        while ((i > 0) | (i = 0)) {
+            let j = 0;
+            let row_filled = true;
+            while (j < board_width) {
+                if (~board_filled(i, j)) { 
+                    let row_filled = false;
+                }
+                let j = j + 1;
+            }
+            if (row_filled) {
+                do clear_row(i);
+                let rows_cleared = rows_cleared + 1;
+            } else {
+                let i = i - 1;
+            }
+        }
+
+        // redraw all blocks
+        let i = 0;
+        while (i < board_height) {
+            let j = 0;
+            while (j < board_width) {
+                if (board_filled(i, j)) {
+                    do Screen.setColor(true);
+                    do draw_block(i, j);
+                } else {
+                    do Screen.setColor(false);
+                    do draw_block(i, j);
+                }
+                let j = j + 1;
+            }
+            let i = i + 1;
+        }
+        do Screen.setColor(true);
+
+        // update the score
+        let score = score + (rows_cleared * rows_cleared * 100);
+        if (rows_cleared = 4) { let score = score + 3400; } //Tetris bonus
+        do draw_score();
+
         return;
     }
+
+    method void clear_row(int idx) {
+        var int i;
+        var int j;
+
+        //shift all rows above idx down one
+        let i = idx;
+        while (i > 0) {
+            let j = 0;
+            while (j < board_width) {
+                let board[i*board_width + j] = board[(i-1)*board_width + j];
+                let j = j + 1;
+            }
+            let i = i - 1;
+        }
+        //clear last row separately
+        let j = 0;
+        while (j < board_width) {
+            let board[j] = false;
+            let j = j + 1;
+        }
+
+        return;
+    }
+
+
 
     method boolean board_filled(int y, int x) {
         return board[y*board_width + x];
@@ -358,6 +418,7 @@ class Game {
 
         do undraw_tetrimino();
         do move_to_candidate();
+        do draw_tetrimino();
         return true;
     }
 
@@ -388,6 +449,7 @@ class Game {
 
         do undraw_tetrimino();
         do move_to_candidate();
+        do draw_tetrimino();
         return true;
     }
 
@@ -402,6 +464,7 @@ class Game {
         
         do undraw_tetrimino();
         do move_to_candidate();
+        do draw_tetrimino();
         return true;
     }
 
@@ -416,6 +479,7 @@ class Game {
         
         do undraw_tetrimino();
         do move_to_candidate();
+        do draw_tetrimino();
         return true;
     }
 
@@ -430,6 +494,7 @@ class Game {
         
         do undraw_tetrimino();
         do move_to_candidate();
+        do draw_tetrimino();
         return true;
     }
 
@@ -444,6 +509,7 @@ class Game {
 
         do undraw_tetrimino();
         do move_to_candidate();
+        do draw_tetrimino();
         return true;
     }
 
