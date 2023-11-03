@@ -41,7 +41,7 @@ class Game {
     field int board_width;
     field int board_height;
 
-    field int time_since_last_move;
+    field int frame_length;
 
     constructor Game new() {
         var int i;
@@ -81,14 +81,9 @@ class Game {
         }
 
         // initialize the timer
-        let time_since_last_move = 0;
+        let frame_length = 500; // iterations per frame
 
         do draw();
-
-        //DEBUG
-        do draw_block(0, 0);
-        do draw_block(23, 9);
-
         
         return this;
     }
@@ -124,7 +119,10 @@ class Game {
 
     method int mod(int x, int y) {
         // return the remainder of x/y
-        return x - ((x/y)*y);
+        var int val;
+        let val = x - ((x/y)*y);
+        if (val < 0) { let val = val + y; }
+        return val;
     }
 
     method boolean spawn_piece() {
@@ -240,18 +238,22 @@ class Game {
         
         var char key;
         var char prev_key;
-        if (false){
-            return;
-        }
+        var boolean pressed_key;
+        var int time_since_last_move;
+
+        let time_since_last_move = 0;
         
         while (true) {
+            let pressed_key = false;
+
             //draw the game
             // do draw();
             do draw_tetrimino();
 
             let key = Keyboard.keyPressed();
             if (~(key = prev_key) & ~(key = 0)) {
-                
+                let pressed_key = true;
+                let time_since_last_move = 0;
                 // let time_since_last_move = 0;
 
                 //clear the current piece
@@ -259,37 +261,56 @@ class Game {
                 do draw_tetrimino();
                 do Screen.setColor(true);
 
-                do reset_move_to_candidate();
-                if (key = 65) { do rotate_ccw(); }  // A
-                if (key = 68) { do rotate_cw(); }   // D
-                if (key = 130) { do move_left(); }  // left arrow
-                if (key = 131) { do move_up(); }    // up arrow
+                // do reset_move_to_candidate();
+                // if (key = 65)  { do rotate_ccw(); }  // A
+                // if (key = 68)  { do rotate_cw(); }   // D
+                // if (key = 133) { do move_down(); }  // down arrow
+                // if (key = 131) { do move_up(); }    // up arrow
                 if (key = 132) { do move_right(); } // right arrow
-                if (key = 133) { do move_down(); }  // down arrow
+                if (key = 130) { do move_left(); }  // left arrow
+                if (key = 133) { do rotate_cw(); }  // down arrow
+                if (key = 131) { do rotate_ccw(); } // up arrow
 
                 //DEBUG change to a different piece
                 if ((key = 87) | (key = 83)) {
-                    if (key = 87) { let piece_type = piece_type + 1; }
-                    if (key = 83) { let piece_type = piece_type - 1; }
-                    if (piece_type = 7) { let piece_type = 0; }
-                    if (piece_type = -1) { let piece_type = 6; }
-                    if (piece_type = 0) { let bbox_size = 4; do set_I(); do move_to_candidate(); }
-                    if (piece_type = 1) { let bbox_size = 3; do set_J(); do move_to_candidate(); }
-                    if (piece_type = 2) { let bbox_size = 3; do set_L(); do move_to_candidate(); }
-                    if (piece_type = 3) { let bbox_size = 3; do set_O(); do move_to_candidate(); }
-                    if (piece_type = 4) { let bbox_size = 3; do set_S(); do move_to_candidate(); }
-                    if (piece_type = 5) { let bbox_size = 3; do set_T(); do move_to_candidate(); }
-                    if (piece_type = 6) { let bbox_size = 3; do set_Z(); do move_to_candidate(); }
+                    if (key = 87) { let piece_type = mod(piece_type + 1, 7); }
+                    if (key = 83) { let piece_type = mod(piece_type - 1, 7); }
+                    if (piece_type = 0) { let bbox_size = 4; do set_I(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                    if (piece_type = 1) { let bbox_size = 3; do set_J(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                    if (piece_type = 2) { let bbox_size = 3; do set_L(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                    if (piece_type = 3) { let bbox_size = 3; do set_O(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                    if (piece_type = 4) { let bbox_size = 3; do set_S(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                    if (piece_type = 5) { let bbox_size = 3; do set_T(); if (can_move_to_candidate()) { do move_to_candidate(); } }
+                    if (piece_type = 6) { let bbox_size = 3; do set_Z(); if (can_move_to_candidate()) { do move_to_candidate(); } }
                 }
 
 
-                //draw the current piece
-                do draw_tetrimino();
             }
 
-            let prev_key = key;
+            if (~pressed_key & (time_since_last_move > frame_length)) {
+                let time_since_last_move = 0;
+                if (~move_down()) {
+                    //lock the piece in place
+                    do set_board(piece_y + block0_y, piece_x + block0_x, true);
+                    do set_board(piece_y + block1_y, piece_x + block1_x, true);
+                    do set_board(piece_y + block2_y, piece_x + block2_x, true);
+                    do set_board(piece_y + block3_y, piece_x + block3_x, true);
 
-            //update the timer
+                    //check for cleared rows
+                    do clear_rows();
+
+                    return;
+                }
+            }
+
+
+            //draw the current piece
+            do draw_tetrimino();
+
+            //update prev key, and timer
+            let prev_key = key;
+            let time_since_last_move = time_since_last_move + 1;
+
         }
 
         // unreachable
@@ -310,12 +331,12 @@ class Game {
         return;
     }
 
-    method void rotate_ccw() {
+    method boolean rotate_ccw() {
         // rotate the current piece counter-clockwise
         //TODO fancy super rotation system checks
 
         // square pieces don't rotate
-        if (piece_type = 3) { return; }
+        if (piece_type = 3) { return true; }
 
         // ccw rotation is: x' = y, y' = bbox_size-x-1
         let block0_x_tmp = block0_y;
@@ -330,18 +351,22 @@ class Game {
         let block3_x_tmp = block3_y;
         let block3_y_tmp = bbox_size-block3_x-1;
 
-        if (~can_move_to_candidate()) { return; }
-        do move_to_candidate();
+        if (~can_move_to_candidate()) { 
+            do reset_move_to_candidate();
+            return false;
+        } 
 
-        return;
+        do undraw_tetrimino();
+        do move_to_candidate();
+        return true;
     }
 
-    method void rotate_cw() {
+    method boolean rotate_cw() {
         // rotate the current piece clockwise
         //TODO fancy super rotation system checks
 
         // square pieces don't rotate
-        if (piece_type = 3) { return; }
+        if (piece_type = 3) { return true; }
 
         // cw rotation is: x' = bbox_size-y-1, y' = x
         let block0_x_tmp = bbox_size-block0_y-1;
@@ -356,54 +381,70 @@ class Game {
         let block3_x_tmp = bbox_size-block3_y-1;
         let block3_y_tmp = block3_x;
 
-        if (~can_move_to_candidate()) { return; }
-        do move_to_candidate();
+        if (~can_move_to_candidate()) { 
+            do reset_move_to_candidate();
+            return false;
+        }
 
-        return;
+        do undraw_tetrimino();
+        do move_to_candidate();
+        return true;
     }
 
-    method void move_left() {
+    method boolean move_left() {
         // move the current piece left
-        //TODO check for collisions
 
         let piece_x_tmp = piece_x - 1;
-        if (~can_move_to_candidate()) { return; }
+        if (~can_move_to_candidate()) {
+            do reset_move_to_candidate();
+            return false;
+        }
+        
+        do undraw_tetrimino();
         do move_to_candidate();
-
-        return;
+        return true;
     }
 
-    method void move_right() {
+    method boolean move_right() {
         // move the current piece right
-        //TODO check for collisions
 
         let piece_x_tmp = piece_x + 1;
-        if (~can_move_to_candidate()) { return; }
+        if (~can_move_to_candidate()) {
+            do reset_move_to_candidate();
+            return false;
+        }
+        
+        do undraw_tetrimino();
         do move_to_candidate();
-
-        return;
+        return true;
     }
 
-    method void move_up() {
+    method boolean move_up() {
         // move the current piece up
-        //TODO check for collisions
 
         let piece_y_tmp = piece_y - 1;
-        if (~can_move_to_candidate()) { return; }
+        if (~can_move_to_candidate()) {
+            do reset_move_to_candidate();
+            return false;
+        }
+        
+        do undraw_tetrimino();
         do move_to_candidate();
-
-        return;
+        return true;
     }
 
-    method void move_down() {
+    method boolean move_down() {
         // move the current piece down
-        //TODO check for collisions
 
         let piece_y_tmp = piece_y + 1;
-        if (~can_move_to_candidate()) { return; }
-        do move_to_candidate();
+        if (~can_move_to_candidate()) {
+            do reset_move_to_candidate();
+            return false;
+        }
 
-        return;
+        do undraw_tetrimino();
+        do move_to_candidate();
+        return true;
     }
 
     method void set_I() {
@@ -557,6 +598,13 @@ class Game {
         do draw_block(piece_y + block2_y, piece_x + block2_x);
         do draw_block(piece_y + block3_y, piece_x + block3_x);
 
+        return;
+    }
+
+    method void undraw_tetrimino() {
+        do Screen.setColor(false);
+        do draw_tetrimino();
+        do Screen.setColor(true);
         return;
     }
 }
