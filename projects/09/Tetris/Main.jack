@@ -1,14 +1,7 @@
 class Main {
     function void main() {
-        // do Screen.drawRectangle(0, 0, 100, 100);
-        // do Screen.setColor(false);
-        // do Screen.drawRectangle(1, 1, 99, 99);
-        // return;
         var Game game;
         let game = Game.new();
-        // do game.draw();
-        // do game.spawn_piece();
-        // do game.draw_piece();
         do game.play();
         do game.dispose();
         return;
