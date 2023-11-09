@@ -1,6 +1,4 @@
 from pathlib import Path
-import sys
-from dataclasses import dataclass
 from argparse import ArgumentParser
 
 from utils import Ref, XML
@@ -28,7 +26,7 @@ def analyze_dir(dir_path:Path):
 def analyze_file(file_path:Path):
     if file_path.suffix != ".jack":
         raise Exception(f"Invalid file: {file_path}")
-    token_path = file_path.with_name(file_path.stem + 'T.xml')
+    token_path = file_path.with_name(file_path.stem + 'TTT').with_suffix(".xml")
     parse_path = file_path.with_suffix(".xml")
     tokenize(file_path, token_path)
     compile(token_path, parse_path)
@@ -59,14 +57,14 @@ def tokenize(inpath:Path, outpath:Path):
         if eat_string_constant(src, xml): continue
         if eat_identifier(src, xml): continue
         pdb.set_trace()
-        raise Exception(f"Invalid token: {src.value}")
+        raise Exception(f"Invalid token: '{src.value}'")
 
-    pdb.set_trace()
     outpath.write_text(str(xml))
+    print(f'Wrote tokens to {outpath}')
 
 def eat_keyword(src:Ref[str], xml:XML) -> bool:
     for keyword in keywords:
-        if src.value.startswith(keyword) and not src.value[len(keyword)].isalnum():
+        if src.value.startswith(keyword) and (len(src.value) == len(keyword) or not src.value[len(keyword)].isalnum()):
             xml.append(XML("keyword", [keyword]))
             src.value = src.value[len(keyword):]
             return True
@@ -143,8 +141,9 @@ def eat_comments(src:Ref[str]) -> bool:
 #################################### COMPILER ####################################
 
 def compile(inpath:Path, outpath:Path):
-    pdb.set_trace()
-
+    # pdb.set_trace()
+    ...
+    print('compilation not implemented yet')
 
 
 
