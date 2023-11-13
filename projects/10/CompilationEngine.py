@@ -174,6 +174,7 @@ def compile_parameter_list(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
     
     # ((type varName) (',' type varName)*)?
     if tokens_ref.value[0].tag not in ["keyword", "identifier"]:
+        root.append_child(XML("parameterList", []))
         return True # empty parameter list
 
     branch = XML("parameterList", [])
@@ -296,15 +297,17 @@ def compile_var_dec(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
 def compile_statements(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
     """statement*"""
     
+    branch = XML("statements", [])
+
     # statement*
-    while compile_do(tokens_ref, root) or \
-          compile_let(tokens_ref, root) or \
-          compile_while(tokens_ref, root) or \
-          compile_return(tokens_ref, root) or \
-          compile_if(tokens_ref, root):
+    while compile_do(tokens_ref, branch) or \
+          compile_let(tokens_ref, branch) or \
+          compile_while(tokens_ref, branch) or \
+          compile_return(tokens_ref, branch) or \
+          compile_if(tokens_ref, branch):
         ...
 
-
+    root.append_child(branch)
     return True
 
 
@@ -543,92 +546,112 @@ def compile_if(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
 def compile_expression(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
     """term (op term)*"""
     
+    branch = XML("expression", [])
+
     # term
-    if not compile_term(tokens_ref, root):
+    if not compile_term(tokens_ref, branch):
         return False
 
     # (op term)*
     while tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children in [["+"], ["-"], ["*"], ["/"], ["&"], ["|"], ["<"], [">"], ["="]]:
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_term(tokens_ref, root):
+        if not compile_term(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
 
+    root.append_child(branch)
     return True
 
 
 def compile_term(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
     """integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term"""
     
+    branch = XML("term", [])
+
     # varName '[' expression ']'   # needs to be before varName
     if tokens_ref.value[0].tag == "identifier" and tokens_ref.value[1].tag == "symbol" and tokens_ref.value[1].children == ["["]:
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, root):
+        if not compile_expression(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
         if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["]"]:
             raise ValueError(f"Invalid program. Expected ']', got {tokens_ref.value[0]}")
 
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+
+        root.append_child(branch)
         return True
 
     # subroutineCall    # needs to be before varName
-    if compile_subroutine_call(tokens_ref, root):
+    if compile_subroutine_call(tokens_ref, branch):
+        root.append_child(branch)
         return True
 
     # integerConstant
     if tokens_ref.value[0].tag == "integerConstant":
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+        
+        root.append_child(branch)
         return True
 
     # stringConstant
     if tokens_ref.value[0].tag == "stringConstant":
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+        
+        root.append_child(branch)
         return True
 
     # keywordConstant
     if tokens_ref.value[0].tag == "keyword" and tokens_ref.value[0].children in [["true"], ["false"], ["null"], ["this"]]:
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+        
+        root.append_child(branch)
         return True
 
     # varName
     if tokens_ref.value[0].tag == "identifier":
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+        
+        root.append_child(branch)
         return True
 
     # '(' expression ')'
     if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == ["("]:
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, root):
+        if not compile_expression(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
         
         if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
         
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+        
+        root.append_child(branch)
         return True
     
     # unaryOp term
     if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children in [["-"], ["~"]]:
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_term(tokens_ref, root):
+        if not compile_term(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
+        
+        root.append_child(branch)
         return True
     
     return False
@@ -690,23 +713,27 @@ def compile_subroutine_call(tokens_ref:Ref[list[XML|str]], root:XML) -> bool:
 
 def compile_expression_list(tokens_ref:Ref[list[XML|str]], root:XML) -> bool: 
     """(expression (',' expression)*)?"""
+
+    branch = XML("expressionList", [])
     
     # (expression (',' expression)*)?
     if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == [")"]:
+        root.append_child(branch)
         return True # empty expression list
 
     # expression
-    if not compile_expression(tokens_ref, root):
+    if not compile_expression(tokens_ref, branch):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # (',' expression)*
     while tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == [","]:
-        root.append_child(tokens_ref.value[0])
+        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, root):
+        if not compile_expression(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
+    root.append_child(branch)
     return True
 
 

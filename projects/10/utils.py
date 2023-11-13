@@ -18,7 +18,7 @@ class XML:
         tab = "    "
 
         if len(self.children) == 0:
-            return f"{tab*depth}<{self.tag}> </{self.tag}>\n"
+            return f"{tab*depth}<{self.tag}>\n{tab*depth}</{self.tag}>\n"
         elif len(self.children) == 1 and isinstance(self.children[0], str):
             return f"{tab*depth}<{self.tag}> {XML.escape(self.children[0])} </{self.tag}>\n"
 
