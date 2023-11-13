@@ -1,6 +1,7 @@
 from pathlib import Path
 from utils import XML, Ref
 
+import pdb
 
 keywords = {
     "class", "constructor", "function", "method", "field", "static", "var", 
@@ -22,6 +23,7 @@ def tokenize(inpath:Path, outpath:Path):
         if eat_integer_constant(src, xml): continue
         if eat_string_constant(src, xml): continue
         if eat_identifier(src, xml): continue
+        
         pdb.set_trace()
         raise Exception(f"Invalid token: '{src.value}'")
 
@@ -31,14 +33,14 @@ def tokenize(inpath:Path, outpath:Path):
 def eat_keyword(src:Ref[str], xml:XML) -> bool:
     for keyword in keywords:
         if src.value.startswith(keyword) and (len(src.value) == len(keyword) or not src.value[len(keyword)].isalnum()):
-            xml.append(XML("keyword", [keyword]))
+            xml.append_child(XML("keyword", [keyword]))
             src.value = src.value[len(keyword):]
             return True
     return False
 
 def eat_symbol(src:Ref[str], xml:XML) -> bool:
     if src.value[0] in symbols:
-        xml.append(XML("symbol", [src.value[0]]))
+        xml.append_child(XML("symbol", [src.value[0]]))
         src.value = src.value[1:]
         return True
     return False
@@ -48,7 +50,7 @@ def eat_integer_constant(src:Ref[str], xml:XML) -> bool:
         i = 1
         while i < len(src.value) and src.value[i].isdigit():
             i += 1
-        xml.append(XML("integerConstant", [src.value[:i]]))
+        xml.append_child(XML("integerConstant", [src.value[:i]]))
         src.value = src.value[i:]
         return True
     return False
@@ -58,7 +60,7 @@ def eat_string_constant(src:Ref[str], xml:XML) -> bool:
         i = 1
         while i < len(src.value) and src.value[i] != '"':
             i += 1
-        xml.append(XML("stringConstant", [src.value[1:i]]))
+        xml.append_child(XML("stringConstant", [src.value[1:i]]))
         src.value = src.value[i+1:]
         return True
     return False
@@ -71,7 +73,7 @@ def eat_identifier(src:Ref[str], xml:XML) -> bool:
         
         if src.value[:i] in keywords: return False # keywords are not identifiers
         
-        xml.append(XML("identifier", [src.value[:i]]))
+        xml.append_child(XML("identifier", [src.value[:i]]))
         src.value = src.value[i:]
         return True
     return False

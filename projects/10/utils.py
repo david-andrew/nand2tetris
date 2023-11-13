@@ -11,7 +11,7 @@ class XML:
     tag:str
     children:list['XML|str']
 
-    def append(self, child:'XML|str'): 
+    def append_child(self, child:'XML|str'): 
         self.children.append(child)
     
     def __str__(self, depth=0):
@@ -47,7 +47,7 @@ class XML:
         return s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     
     @staticmethod
-    def from_str(src:str) -> 'XML':
+    def from_string(src:str) -> 'XML':
         
         def eat_whitespace(src:Ref[str]) -> str|None:
             i = 0
@@ -100,12 +100,12 @@ class XML:
 
             if (tag := eat_opening_tag(src)) is not None:
                 xml = XML(tag, [])
-                stack[-1].append(xml)
+                stack[-1].append_child(xml)
                 stack.append(xml)
                 continue
             
             if (text := eat_text(src)) is not None:
-                stack[-1].append(text)
+                stack[-1].append_child(text)
                 continue
 
             assert False, f"Invalid XML: {src.value}"
@@ -125,7 +125,7 @@ def main():
     from pathlib import Path
     import pdb
     test = Path("ArrayTest/Main.xml").read_text()
-    test = XML.from_str(test)
+    test = XML.from_string(test)
 
     pdb.set_trace()
 

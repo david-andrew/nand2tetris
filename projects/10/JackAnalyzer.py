@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 import subprocess
 
 from JackTokenizer import tokenize
+from CompilationEngine import compile
 
 import pdb
 
@@ -50,7 +51,8 @@ def compare_dir(dir_path:Path):
     done = set()
     for file_path in dir_path.iterdir():
         if file_path.stem.endswith("TTT") or file_path.stem.endswith("PPP"):
-            answer_path = file_path.with_name(file_path.stem[:-2]).with_suffix(".xml")
+            chop_length = 2 if file_path.stem.endswith("TTT") else 3 # i.e. compare MainTTT.xml to MainT.xml, and MainPPP.xml to Main.xml
+            answer_path = file_path.with_name(file_path.stem[:-chop_length]).with_suffix(".xml")
             done.add(file_path)
             compare_file(file_path, answer_path)
 
@@ -65,6 +67,8 @@ def compare_file(test_path:Path, answer_path:Path):
         print(f"[Success] comparing {test_path} to {answer_path}")
     else:
         print(f"[Failure] comparing {test_path} to {answer_path}")
+        print(res.stdout.decode())
+        print(res.stderr.decode())
 
 
 
