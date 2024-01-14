@@ -27,11 +27,12 @@ def analyze_file(file_path:Path):
     if file_path.suffix != ".jack":
         raise Exception(f"Invalid file: {file_path}")
 
-    token_path = file_path.with_name(file_path.stem + 'TTT').with_suffix(".xml")
-    tokenize(file_path, token_path)
+    # compile the file to VM code
+    tokens = tokenize(file_path)
+    vmcode = compile(tokens)
 
-    parse_path = file_path.with_name(file_path.stem + 'PPP').with_suffix(".xml")
-    compile(token_path, parse_path)
+    out_path = file_path.with_suffix(".vm")
+    out_path.write_text(vmcode)
 
 
 
