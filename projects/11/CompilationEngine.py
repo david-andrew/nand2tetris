@@ -61,31 +61,30 @@ def compile_class(tokens_ref: Ref[list[Token]]) -> str | None:
 
     class_symbols = SymbolTable()
 
-    # root.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # className
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected className, got {tokens_ref.value[0]}")
 
-    # root.append_child(tokens_ref.value[0])
+    class_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # '{'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
         raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
 
-    # root.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # classVarDec*
     while compile_class_var_dec(tokens_ref, class_symbols):
         ...
-    pdb.set_trace()
 
+    vmcode_chunks = []
     # subroutineDec*
-    while compile_subroutine(tokens_ref):
-        ...
+    while (code := compile_subroutine(tokens_ref, class_name, class_symbols)) is not None:
+        vmcode_chunks.append(code)
+    pdb.set_trace()
 
     # '}'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
@@ -112,14 +111,14 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value not in ["static", "field"]:
         return False
 
-    decl0_kind = tokens_ref.value[0].value
+    kind = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # type
     if not is_type(tokens_ref.value[0]):
         raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
 
-    decl0_type = tokens_ref.value[0].value
+    type = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
@@ -130,7 +129,7 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     tokens_ref.value = tokens_ref.value[1:]
 
     # insert the first variable
-    class_symbols.insert(name, decl0_type, decl0_kind)
+    class_symbols.insert(name, type, kind)
 
     # (',' varName)*
     while tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == ",":
@@ -140,7 +139,7 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
             raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
 
         name = tokens_ref.value[0].value
-        class_symbols.insert(name, decl0_type, decl0_kind)
+        class_symbols.insert(name, type, kind)
         tokens_ref.value = tokens_ref.value[1:]
 
     # ';'
@@ -152,101 +151,104 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     return True
 
 
-def compile_subroutine(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable) -> bool:
     """('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' subroutineBody"""
 
     # ('constructor' | 'function' | 'method')
-    if tokens_ref.value[0].tag != "keyword" or tokens_ref.value[0].children not in [["constructor"], ["function"], ["method"]]:
+    if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value not in ["constructor", "function", "method"]:
         return False
 
-    branch = XML("subroutineDec", [])
-    branch.append_child(tokens_ref.value[0])
+    # set up the symbol table for this subroutine
+    subroutine_symbols = SymbolTable()
+    if tokens_ref.value[0].value == "method":
+        subroutine_symbols.insert("this", class_name, "argument")
+
     tokens_ref.value = tokens_ref.value[1:]
 
     # ('void' | type)
-    if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].tag != "keyword" and tokens_ref.value[0].children != ["void"]:
+    if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].type != "keyword" and tokens_ref.value[0].value != "void":
         raise ValueError(f"Invalid program. Expected type or 'void', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
+    # branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineName
-    if tokens_ref.value[0].tag != "identifier":
+    if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected subroutineName, got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
+    # branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # '('
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["("]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
         raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
+    # branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # parameterList
-    if not compile_parameter_list(tokens_ref, branch):
+    if not compile_parameter_list(tokens_ref, subroutine_symbols):
         raise ValueError(f"Invalid program. Expected parameterList, got {tokens_ref.value[0]}")
 
     # ')'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
         raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
+    pdb.set_trace()
     # subroutineBody
     if not compile_subroutine_body(tokens_ref, branch):
         raise ValueError(f"Invalid program. Expected subroutineBody, got {tokens_ref.value[0]}")
 
-    root.append_child(branch)
+    # root.append_child(branch)
+    pdb.set_trace()
     return True
 
 
-def compile_parameter_list(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_parameter_list(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTable) -> bool:
     """((type varName) (',' type varName)*)?"""
-
     # ((type varName) (',' type varName)*)?
-    if tokens_ref.value[0].tag not in ["keyword", "identifier"]:
-        root.append_child(XML("parameterList", []))
+    if tokens_ref.value[0].type not in ["keyword", "identifier"]:
         return True  # empty parameter list
-
-    branch = XML("parameterList", [])
 
     # type
     if not is_type(tokens_ref.value[0]):
         raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
+    type = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
-    if tokens_ref.value[0].tag != "identifier":
+    if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
+    name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
+    # insert the first variable
+    subroutine_symbols.insert(name, type, "argument")
+
     # (',' type varName)*
-    while tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == [","]:
-        branch.append_child(tokens_ref.value[0])
+    while tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == ",":
         tokens_ref.value = tokens_ref.value[1:]
 
         # type
         if not is_type(tokens_ref.value[0]):
             raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
 
-        branch.append_child(tokens_ref.value[0])
+        type = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
         # varName
-        if tokens_ref.value[0].tag != "identifier":
+        if tokens_ref.value[0].type != "identifier":
             raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
 
-        branch.append_child(tokens_ref.value[0])
+        name = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
+        subroutine_symbols.insert(name, type, "argument")
+
     return True
 
 
