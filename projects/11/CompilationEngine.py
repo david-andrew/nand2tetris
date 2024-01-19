@@ -1,6 +1,7 @@
 from utils import Ref
 from JackTokenizer import Token
 from SymbolTable import SymbolTable
+from VMWriter import VMWriter
 
 ##
 import pdb
@@ -14,24 +15,24 @@ XML = None
 
 def compile(tokens: list[Token]) -> str:
     tokens_ref = Ref(tokens)
+    writer = VMWriter()
 
-    vmcode = compile_class(tokens_ref)
-    if vmcode is None:
+    if not compile_class(tokens_ref, writer):
         raise ValueError(f"Invalid program. Remaining tokens: {tokens_ref.value}")
 
-    return vmcode
+    return writer.__str__()
 
 
-def compile_class(tokens_ref: Ref[list[Token]]) -> str | None:
+def compile_class(tokens_ref: Ref[list[Token]], writer:VMWriter) -> bool:
     """'class' className '{' classVarDec* subroutineDec* '}'"""
 
     # 'class'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "class":
         return False
 
-    class_symbols = SymbolTable()
-
     tokens_ref.value = tokens_ref.value[1:]
+
+    class_symbols = SymbolTable()
 
     # className
     if tokens_ref.value[0].type != "identifier":
@@ -50,10 +51,9 @@ def compile_class(tokens_ref: Ref[list[Token]]) -> str | None:
     while compile_class_var_dec(tokens_ref, class_symbols):
         ...
 
-    vmcode_chunks = []
     # subroutineDec*
-    while (code := compile_subroutine(tokens_ref, class_name, class_symbols)) is not None:
-        vmcode_chunks.append(code)
+    while compile_subroutine(tokens_ref, class_name, class_symbols, writer):
+        ...
     pdb.set_trace()
 
     # '}'
@@ -72,6 +72,7 @@ def is_type(token: Token) -> bool:
         return True
     if token.type == "identifier":
         return True
+    return False
 
 
 def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable) -> bool:
@@ -121,12 +122,12 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     return True
 
 
-def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable) -> str | None:
+def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, writer:VMWriter) -> bool:
     """('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' subroutineBody"""
 
     # ('constructor' | 'function' | 'method')
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value not in ["constructor", "function", "method"]:
-        return None
+        return False
 
     # set up the symbol table for this subroutine
     subroutine_symbols = SymbolTable()
@@ -167,7 +168,7 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineBody
-    vmcode = compile_subroutine_body(tokens_ref, class_symbols, subroutine_symbols)
+    vmcode = compile_subroutine_body(tokens_ref, class_symbols, subroutine_symbols, writer)
     if vmcode is None:
         raise ValueError(f"Invalid program. Expected subroutineBody, got {tokens_ref.value[0]}")
 
@@ -220,12 +221,12 @@ def compile_parameter_list(tokens_ref: Ref[list[Token]], subroutine_symbols: Sym
     return True
 
 
-def compile_subroutine_body(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable) -> str | None:
+def compile_subroutine_body(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer:VMWriter) -> bool:
     """'{' varDec* statements '}'"""
 
     # '{'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
-        return None
+        return False
 
     tokens_ref.value = tokens_ref.value[1:]
 
