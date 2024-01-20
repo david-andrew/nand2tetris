@@ -11,8 +11,6 @@ import pdb
 XML = None
 
 
-
-
 def compile(tokens: list[Token]) -> str:
     tokens_ref = Ref(tokens)
     writer = VMWriter()
@@ -23,7 +21,7 @@ def compile(tokens: list[Token]) -> str:
     return writer.__str__()
 
 
-def compile_class(tokens_ref: Ref[list[Token]], writer:VMWriter) -> bool:
+def compile_class(tokens_ref: Ref[list[Token]], writer: VMWriter) -> bool:
     """'class' className '{' classVarDec* subroutineDec* '}'"""
 
     # 'class'
@@ -54,13 +52,11 @@ def compile_class(tokens_ref: Ref[list[Token]], writer:VMWriter) -> bool:
     # subroutineDec*
     while compile_subroutine(tokens_ref, class_name, class_symbols, writer):
         ...
-    pdb.set_trace()
 
     # '}'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
 
-    # root.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     return True
@@ -122,7 +118,7 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     return True
 
 
-def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, writer:VMWriter) -> bool:
+def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, writer: VMWriter) -> bool:
     """('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' subroutineBody"""
 
     # ('constructor' | 'function' | 'method')
@@ -140,15 +136,19 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].type != "keyword" and tokens_ref.value[0].value != "void":
         raise ValueError(f"Invalid program. Expected type or 'void', got {tokens_ref.value[0]}")
 
-    # branch.append_child(tokens_ref.value[0])
+    # return_type = tokens_ref.value[0].value
+    return_void = tokens_ref.value[0].value == "void"
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineName
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected subroutineName, got {tokens_ref.value[0]}")
 
-    # branch.append_child(tokens_ref.value[0])
+    subroutine_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
+
+    # create the initial label for the subroutine
+    writer.write_function(f"{class_name}.{subroutine_name}", subroutine_symbols.var_count("local"))
 
     # '('
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
@@ -168,11 +168,10 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineBody
-    vmcode = compile_subroutine_body(tokens_ref, class_symbols, subroutine_symbols, writer)
-    if vmcode is None:
+    if not compile_subroutine_body(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected subroutineBody, got {tokens_ref.value[0]}")
 
-    return vmcode
+    return True
 
 
 def compile_parameter_list(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTable) -> bool:
@@ -221,7 +220,7 @@ def compile_parameter_list(tokens_ref: Ref[list[Token]], subroutine_symbols: Sym
     return True
 
 
-def compile_subroutine_body(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer:VMWriter) -> bool:
+def compile_subroutine_body(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'{' varDec* statements '}'"""
 
     # '{'
@@ -234,22 +233,17 @@ def compile_subroutine_body(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
     while compile_var_dec(tokens_ref, subroutine_symbols):
         ...
 
-    print(subroutine_symbols)
-    print(class_symbols)
-    pdb.set_trace()
     # statements
-    if not compile_statements(tokens_ref, branch):
+    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
     # '}'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["}"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         pdb.set_trace()
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
     return True
 
 
@@ -300,109 +294,99 @@ def compile_var_dec(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTabl
     return True
 
 
-def compile_statements(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_statements(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """statement*"""
 
-    branch = XML("statements", [])
-
     # statement*
-    while compile_do(tokens_ref, branch) or \
-            compile_let(tokens_ref, branch) or \
-            compile_while(tokens_ref, branch) or \
-            compile_return(tokens_ref, branch) or \
-            compile_if(tokens_ref, branch):
+    while compile_do(tokens_ref, class_symbols, subroutine_symbols, writer) or \
+            compile_let(tokens_ref, class_symbols, subroutine_symbols, writer) or \
+            compile_while(tokens_ref, class_symbols, subroutine_symbols, writer) or \
+            compile_return(tokens_ref, class_symbols, subroutine_symbols, writer) or \
+            compile_if(tokens_ref, class_symbols, subroutine_symbols, writer):
         ...
 
-    root.append_child(branch)
     return True
 
 
-def compile_do(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'do' subroutineCall ';'"""
 
     # 'do'
-    if tokens_ref.value[0].tag != "keyword" or tokens_ref.value[0].children != ["do"]:
+    if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "do":
         return False
 
-    branch = XML("doStatement", [])
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineCall
-    if not compile_subroutine_call(tokens_ref, branch):
+    if not compile_subroutine_call(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected subroutineCall, got {tokens_ref.value[0]}")
 
     # ';'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [";"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
     return True
 
 
-def compile_let(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'let' varName ('[' expression ']')? '=' expression ';'"""
 
     # 'let'
-    if tokens_ref.value[0].tag != "keyword" or tokens_ref.value[0].children != ["let"]:
+    if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "let":
         return False
 
-    branch = XML("letStatement", [])
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
-    if tokens_ref.value[0].tag != "identifier":
+    if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
+    var_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # ('[' expression ']')?
-    if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == ["["]:
+    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == "[":
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
         if not compile_expression(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["]"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "]":
             raise ValueError(f"Invalid program. Expected ']', got {tokens_ref.value[0]}")
 
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
     # '='
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["="]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "=":
         raise ValueError(f"Invalid program. Expected '=', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
-    if not compile_expression(tokens_ref, branch):
+    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ';'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [";"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         pdb.set_trace()
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
+    writer.write_push("LOCAL", subroutine_symbols.index_of(var_name))
+
     return True
 
 
-def compile_while(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'while' '(' expression ')' '{' statements '}'"""
 
     # 'while'
-    if tokens_ref.value[0].tag != "keyword" or tokens_ref.value[0].children != ["while"]:
+    if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "while":
         return False
 
     branch = XML("whileStatement", [])
@@ -450,38 +434,36 @@ def compile_while(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
     return True
 
 
-def compile_return(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'return' expression? ';'"""
 
     # 'return'
-    if tokens_ref.value[0].tag != "keyword" or tokens_ref.value[0].children != ["return"]:
+    if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "return":
         return False
 
-    branch = XML("returnStatement", [])
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression?
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [";"]:
-        if not compile_expression(tokens_ref, branch):
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
+        if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ';'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [";"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
+    writer.write_return()
+
     return True
 
 
-def compile_if(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?"""
 
     # 'if'
-    if tokens_ref.value[0].tag != "keyword" or tokens_ref.value[0].children != ["if"]:
+    if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "if":
         return False
 
     branch = XML("ifStatement", [])
@@ -549,34 +531,50 @@ def compile_if(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
     return True
 
 
-def compile_expression(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_expression(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """term (op term)*"""
 
-    branch = XML("expression", [])
-
     # term
-    if not compile_term(tokens_ref, branch):
+    if not compile_term(tokens_ref, class_symbols, subroutine_symbols, writer):
         return False
 
     # (op term)*
-    while tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children in [["+"], ["-"], ["*"], ["/"], ["&"], ["|"], ["<"], [">"], ["="]]:
-        branch.append_child(tokens_ref.value[0])
+    while tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value in "+-*/&|<>=":
+        operator = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_term(tokens_ref, branch):
+        if not compile_term(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
 
-    root.append_child(branch)
+        if operator == "+":
+            writer.write_arithmetic("ADD")
+        elif operator == "-":
+            writer.write_arithmetic("SUB")
+        elif operator == "*":
+            writer.write_call("Math.multiply", 2)
+        elif operator == "/":
+            writer.write_call("Math.divide", 2)
+        elif operator == "&":
+            writer.write_arithmetic("AND")
+        elif operator == "|":
+            writer.write_arithmetic("OR")
+        elif operator == "<":
+            writer.write_arithmetic("LT")
+        elif operator == ">":
+            writer.write_arithmetic("GT")
+        elif operator == "=":
+            writer.write_arithmetic("EQ")
+        else:
+            raise ValueError(f"Invalid operator: {operator}")
+
     return True
 
 
-def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term"""
 
-    branch = XML("term", [])
-
     # varName '[' expression ']'   # needs to be before varName
-    if tokens_ref.value[0].tag == "identifier" and tokens_ref.value[1].tag == "symbol" and tokens_ref.value[1].children == ["["]:
+    if tokens_ref.value[0].type == "identifier" and tokens_ref.value[1].type == "symbol" and tokens_ref.value[1].value == "[":
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -586,7 +584,7 @@ def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
         if not compile_expression(tokens_ref, branch):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["]"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].children != ["]"]:
             raise ValueError(f"Invalid program. Expected ']', got {tokens_ref.value[0]}")
 
         branch.append_child(tokens_ref.value[0])
@@ -596,20 +594,19 @@ def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
         return True
 
     # subroutineCall    # needs to be before varName
-    if compile_subroutine_call(tokens_ref, branch):
+    if compile_subroutine_call(tokens_ref, class_symbols, subroutine_symbols, writer):
         root.append_child(branch)
         return True
 
     # integerConstant
-    if tokens_ref.value[0].tag == "integerConstant":
-        branch.append_child(tokens_ref.value[0])
+    if tokens_ref.value[0].type == "integerConstant":
+        writer.write_push("CONST", tokens_ref.value[0].value)
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(branch)
         return True
 
     # stringConstant
-    if tokens_ref.value[0].tag == "stringConstant":
+    if tokens_ref.value[0].type == "stringConstant":
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -617,7 +614,7 @@ def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
         return True
 
     # keywordConstant
-    if tokens_ref.value[0].tag == "keyword" and tokens_ref.value[0].children in [["true"], ["false"], ["null"], ["this"]]:
+    if tokens_ref.value[0].type == "keyword" and tokens_ref.value[0].children in [["true"], ["false"], ["null"], ["this"]]:
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -625,7 +622,7 @@ def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
         return True
 
     # varName
-    if tokens_ref.value[0].tag == "identifier":
+    if tokens_ref.value[0].type == "identifier":
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -633,24 +630,21 @@ def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
         return True
 
     # '(' expression ')'
-    if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == ["("]:
-        branch.append_child(tokens_ref.value[0])
+    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == "(":
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, branch):
+        if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
-        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(branch)
         return True
 
     # unaryOp term
-    if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children in [["-"], ["~"]]:
+    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].children in [["-"], ["~"]]:
         branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -663,11 +657,11 @@ def compile_term(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
     return False
 
 
-def compile_subroutine_call(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """subroutineName '(' expressionList ')' | (className | varName) '.' subroutineName '(' expressionList ')'"""
 
     # subroutineName '(' expressionList ')'
-    if tokens_ref.value[0].tag == "identifier" and tokens_ref.value[1].tag == "symbol" and tokens_ref.value[1].children == ["("]:
+    if tokens_ref.value[0].type == "identifier" and tokens_ref.value[1].type == "symbol" and tokens_ref.value[1].value == "(":
         root.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -685,59 +679,64 @@ def compile_subroutine_call(tokens_ref: Ref[list[XML | str]], root: XML) -> bool
         return True
 
     # (className | varName) '.' subroutineName '(' expressionList ')'
-    if tokens_ref.value[0].tag == "identifier" and tokens_ref.value[1].tag == "symbol" and tokens_ref.value[1].children == ["."]:
-        root.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
+    if tokens_ref.value[0].type == "identifier" and tokens_ref.value[1].type == "symbol" and tokens_ref.value[1].value == ".":
+        nArgs = 0
+        parent_name = tokens_ref.value[0].value
+        tokens_ref.value = tokens_ref.value[2:]
 
-        root.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
-
-        if tokens_ref.value[0].tag != "identifier":
+        if tokens_ref.value[0].type != "identifier":
             raise ValueError(f"Invalid program. Expected subroutineName, got {tokens_ref.value[0]}")
 
-        root.append_child(tokens_ref.value[0])
+        method_name = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["("]:
+        call_label = f"{parent_name}.{method_name}"
+
+        parent_symbol = subroutine_symbols.get(parent_name, None) or class_symbols.get(parent_name, None)
+        if parent_symbol is not None:
+            writer.write_push(parent_symbol.kind, parent_symbol.index)
+            pdb.set_trace()
+            call_label = f"{parent_symbol.type}.{method_name}"
+            nArgs += 1
+
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
             raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
 
-        root.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression_list(tokens_ref, root):
-            raise ValueError(f"Invalid program. Expected expressionList, got {tokens_ref.value[0]}")
+        nArgs += compile_expression_list(tokens_ref, class_symbols, subroutine_symbols, writer)
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
-        root.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+
+        writer.write_call(call_label, nArgs)
+
         return True
 
     return False
 
 
-def compile_expression_list(tokens_ref: Ref[list[XML | str]], root: XML) -> bool:
+def compile_expression_list(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> int:
     """(expression (',' expression)*)?"""
-
-    branch = XML("expressionList", [])
-
+    nArgs = 0
     # (expression (',' expression)*)?
-    if tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == [")"]:
-        root.append_child(branch)
-        return True  # empty expression list
+    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == ")":
+        return nArgs  # empty expression list
 
     # expression
-    if not compile_expression(tokens_ref, branch):
+    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
+    nArgs += 1
 
     # (',' expression)*
-    while tokens_ref.value[0].tag == "symbol" and tokens_ref.value[0].children == [","]:
-        branch.append_child(tokens_ref.value[0])
+    while tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == ",":
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, branch):
+        if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
-    root.append_child(branch)
-    return True
+        nArgs += 1
+
+    return nArgs
