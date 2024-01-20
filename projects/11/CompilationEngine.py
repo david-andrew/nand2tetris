@@ -380,9 +380,19 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
 
     tokens_ref.value = tokens_ref.value[1:]
 
-    writer.write_push("local", subroutine_symbols.index_of(var_name))
+    symbol = subroutine_symbols.get(var_name, None) or class_symbols.get(var_name, None)
+    assert symbol is not None, f"Variable {var_name} not found. Expected local or class variable."
+    if symbol.kind == "field":
+        pdb.set_trace()
+        # TODO: need to anchor this to the correct address before we can use...
+        writer.write_push("this", symbol.index)
+    else:
+        writer.write_push(symbol.kind, symbol.index)
 
     return True
+
+
+while_label_count = 0
 
 
 def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
@@ -392,48 +402,52 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "while":
         return False
 
-    branch = XML("whileStatement", [])
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    # '('
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["("]:
-        raise ValueError(
-            f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
+    global while_label_count
+    L1 = f"WHILE{while_label_count}"
+    L2 = f"WHILE_END{while_label_count}"
+    while_label_count += 1
+    writer.write_label(L1)
 
-    branch.append_child(tokens_ref.value[0])
+    # '('
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
+        raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
+
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
-    if not compile_expression(tokens_ref, branch):
+    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ')'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
         raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
+    writer.write_arithmetic("not")
+    writer.write_if(L2)
+
     # '{'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["{"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
         raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # statements
-    if not compile_statements(tokens_ref, branch):
+    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
     # '}'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["}"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
+    writer.write_goto(L1)
+    writer.write_label(L2)
+
     return True
 
 
@@ -600,7 +614,6 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
 
     # subroutineCall    # needs to be before varName
     if compile_subroutine_call(tokens_ref, class_symbols, subroutine_symbols, writer):
-        root.append_child(branch)
         return True
 
     # integerConstant
@@ -619,19 +632,38 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
         return True
 
     # keywordConstant
-    if tokens_ref.value[0].type == "keyword" and tokens_ref.value[0].children in [["true"], ["false"], ["null"], ["this"]]:
-        branch.append_child(tokens_ref.value[0])
+    if tokens_ref.value[0].type == "keyword" and tokens_ref.value[0].value in ["true", "false", "null", "this"]:
+        if tokens_ref.value[0].value == "true":
+            writer.write_push("constant", 1)
+            writer.write_arithmetic("neg")
+        elif tokens_ref.value[0].value == "false":
+            writer.write_push("constant", 0)
+        elif tokens_ref.value[0].value == "null":
+            writer.write_push("constant", 0)
+        elif tokens_ref.value[0].value == "this":
+            pdb.set_trace()
+            # not sure if this is right
+            writer.write_push("pointer", 0)
+        else:
+            raise ValueError(f"Invalid keyword: {tokens_ref.value[0].value}")
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(branch)
         return True
 
     # varName
     if tokens_ref.value[0].type == "identifier":
-        branch.append_child(tokens_ref.value[0])
+        name = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(branch)
+        symbol = subroutine_symbols.get(name, None) or class_symbols.get(name, None)
+        assert symbol is not None, f"Variable {name} not found. Expected local or class variable."
+        if symbol.kind == "field":
+            pdb.set_trace()
+            # TODO: need to anchor this to the correct address before we can use...
+            writer.write_push("this", symbol.index)
+        else:
+            writer.write_push(symbol.kind, symbol.index)
+
         return True
 
     # '(' expression ')'
@@ -649,14 +681,19 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
         return True
 
     # unaryOp term
-    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].children in [["-"], ["~"]]:
-        branch.append_child(tokens_ref.value[0])
+    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value in "-~":
+        operator = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_term(tokens_ref, branch):
+        if not compile_term(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
 
-        root.append_child(branch)
+        if operator == "-":
+            writer.write_arithmetic("neg")
+        elif operator == "~":
+            writer.write_arithmetic("not")
+        else:
+            raise ValueError(f"Invalid operator: {operator}")
         return True
 
     return False

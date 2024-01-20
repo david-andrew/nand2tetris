@@ -8,7 +8,7 @@ import pdb
 class Symbol:
     # name: str # key in the symbol table
     type: str
-    kind: Literal['static', 'field', 'argument', 'var']
+    kind: Literal['static', 'field', 'argument', 'local']
     index: int
 
 
