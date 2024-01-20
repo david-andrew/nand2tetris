@@ -327,6 +327,9 @@ def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
 
     tokens_ref.value = tokens_ref.value[1:]
 
+    # throw away the return value
+    writer.write_pop("TEMP", 0)
+
     return True
 
 
