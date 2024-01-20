@@ -478,6 +478,9 @@ def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, sub
     return True
 
 
+if_label_count = 0
+
+
 def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?"""
 
@@ -485,68 +488,70 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "if":
         return False
 
-    branch = XML("ifStatement", [])
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
-    # '('
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["("]:
-        raise ValueError(
-            f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
+    global if_label_count
+    L1 = f"IF_FALSE{if_label_count}"
+    L2 = f"IF_END{if_label_count}"
+    if_label_count += 1
 
-    branch.append_child(tokens_ref.value[0])
+    # '('
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
+        raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
+
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
-    if not compile_expression(tokens_ref, branch):
+    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ')'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
         raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
+    writer.write_arithmetic("not")
+    writer.write_if(L1)
+
     # '{'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["{"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
         raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # statements
-    if not compile_statements(tokens_ref, branch):
+    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
     # '}'
-    if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["}"]:
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
 
-    branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
+    writer.write_goto(L2)
+    writer.write_label(L1)
+
     # ('else' '{' statements '}')?
-    if tokens_ref.value[0].tag == "keyword" and tokens_ref.value[0].children == ["else"]:
-        branch.append_child(tokens_ref.value[0])
+    if tokens_ref.value[0].type == "keyword" and tokens_ref.value[0].value == "else":
         tokens_ref.value = tokens_ref.value[1:]
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["{"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
             raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
 
-        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_statements(tokens_ref, branch):
+        if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != ["}"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
             raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
 
-        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-    root.append_child(branch)
+    writer.write_label(L2)
+
     return True
 
 
