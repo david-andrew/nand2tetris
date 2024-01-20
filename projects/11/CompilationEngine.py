@@ -328,7 +328,7 @@ def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     tokens_ref.value = tokens_ref.value[1:]
 
     # throw away the return value
-    writer.write_pop("TEMP", 0)
+    writer.write_pop("temp", 0)
 
     return True
 
@@ -380,7 +380,7 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
 
     tokens_ref.value = tokens_ref.value[1:]
 
-    writer.write_push("LOCAL", subroutine_symbols.index_of(var_name))
+    writer.write_push("local", subroutine_symbols.index_of(var_name))
 
     return True
 
@@ -550,23 +550,23 @@ def compile_expression(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable,
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
 
         if operator == "+":
-            writer.write_arithmetic("ADD")
+            writer.write_arithmetic("add")
         elif operator == "-":
-            writer.write_arithmetic("SUB")
+            writer.write_arithmetic("sub")
         elif operator == "*":
             writer.write_call("Math.multiply", 2)
         elif operator == "/":
             writer.write_call("Math.divide", 2)
         elif operator == "&":
-            writer.write_arithmetic("AND")
+            writer.write_arithmetic("and")
         elif operator == "|":
-            writer.write_arithmetic("OR")
+            writer.write_arithmetic("or")
         elif operator == "<":
-            writer.write_arithmetic("LT")
+            writer.write_arithmetic("lt")
         elif operator == ">":
-            writer.write_arithmetic("GT")
+            writer.write_arithmetic("gt")
         elif operator == "=":
-            writer.write_arithmetic("EQ")
+            writer.write_arithmetic("eq")
         else:
             raise ValueError(f"Invalid operator: {operator}")
 
@@ -603,7 +603,7 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
 
     # integerConstant
     if tokens_ref.value[0].type == "integerConstant":
-        writer.write_push("CONST", tokens_ref.value[0].value)
+        writer.write_push("constant", tokens_ref.value[0].value)
         tokens_ref.value = tokens_ref.value[1:]
 
         return True

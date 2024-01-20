@@ -1,13 +1,14 @@
 from dataclasses import dataclass
-
+from typing import Literal
 ##
 import pdb
+
 
 @dataclass
 class Symbol:
     # name: str # key in the symbol table
     type: str
-    kind: str
+    kind: Literal['static', 'field', 'argument', 'var']
     index: int
 
 

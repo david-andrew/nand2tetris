@@ -2,13 +2,13 @@ from typing import Literal
 
 
 class VMWriter(list[str]):
-    def write_push(self, segment: Literal['CONST', 'ARG', 'LOCAL', 'STATIC', 'THIS', 'THAT', 'POINTER', 'TEMP'], index: int) -> None:
+    def write_push(self, segment: Literal['constant', 'argument', 'local', 'static', 'this', 'that', 'pointer', 'temp'], index: int) -> None:
         self.append(f"push {segment} {index}")
 
-    def write_pop(self, segment: Literal['CONST', 'ARG', 'LOCAL', 'STATIC', 'THIS', 'THAT', 'POINTER', 'TEMP'], index: int) -> None:
+    def write_pop(self, segment: Literal['constant', 'argument', 'local', 'static', 'this', 'that', 'pointer', 'temp'], index: int) -> None:
         self.append(f"pop {segment} {index}")
 
-    def write_arithmetic(self, command: Literal['ADD', 'SUB', 'NEG', 'EQ', 'GT', 'LT', 'AND', 'OR', 'NOT']) -> None:
+    def write_arithmetic(self, command: Literal['add', 'sub', 'neg', 'eq', 'gt', 'lt', 'and', 'or', 'not']) -> None:
         self.append(command)
 
     def write_label(self, label: str) -> None:
