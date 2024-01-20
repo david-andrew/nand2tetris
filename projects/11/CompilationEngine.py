@@ -450,6 +450,8 @@ def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, sub
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
+    else:
+        writer.write_push("constant", 0)
 
     # ';'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
