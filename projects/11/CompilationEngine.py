@@ -147,8 +147,10 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     subroutine_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
-    # create the initial label for the subroutine
-    writer.write_function(f"{class_name}.{subroutine_name}", subroutine_symbols.var_count("local"))
+    # would want to create the initial label for the subroutine here
+    # but need to wait until we know how many locals there are
+    # so just keep track of where we'll put the label later
+    function_entry_index = len(writer)
 
     # '('
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
@@ -170,6 +172,11 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     # subroutineBody
     if not compile_subroutine_body(tokens_ref, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected subroutineBody, got {tokens_ref.value[0]}")
+
+    # now that we know how many locals there are, we can create the function label
+    writer.write_function(f"{class_name}.{subroutine_name}", subroutine_symbols.var_count("local"))
+    function_entry = writer.pop()
+    writer.insert(function_entry_index, function_entry)
 
     return True
 
