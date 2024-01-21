@@ -27,7 +27,6 @@ def compile_class(tokens_ref: Ref[list[Token]], writer: VMWriter) -> bool:
     # 'class'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "class":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     class_symbols = SymbolTable()
@@ -35,14 +34,12 @@ def compile_class(tokens_ref: Ref[list[Token]], writer: VMWriter) -> bool:
     # className
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected className, got {tokens_ref.value[0]}")
-
     class_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # '{'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
         raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # classVarDec*
@@ -56,7 +53,6 @@ def compile_class(tokens_ref: Ref[list[Token]], writer: VMWriter) -> bool:
     # '}'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     return True
@@ -77,21 +73,18 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     # ('static' | 'field')
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value not in ["static", "field"]:
         return False
-
     kind = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # type
     if not is_type(tokens_ref.value[0]):
         raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
-
     type = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
-
     name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
@@ -112,14 +105,13 @@ def compile_class_var_dec(tokens_ref: Ref[list[Token]], class_symbols: SymbolTab
     # ';'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     return True
 
 
 def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, writer: VMWriter) -> bool:
-    """('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' subroutineBody"""
+    """('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' '{' varDec* statements '}'"""
 
     # ('constructor' | 'function' | 'method')
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value not in ["constructor", "function", "method"]:
@@ -129,34 +121,22 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     subroutine_symbols = SymbolTable()
     if tokens_ref.value[0].value == "method":
         subroutine_symbols.insert("this", class_name, "argument")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # ('void' | type)
     if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].type != "keyword" and tokens_ref.value[0].value != "void":
         raise ValueError(f"Invalid program. Expected type or 'void', got {tokens_ref.value[0]}")
-
-    # return_type = tokens_ref.value[0].value
-    return_void = tokens_ref.value[0].value == "void"
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineName
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected subroutineName, got {tokens_ref.value[0]}")
-
     subroutine_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
-
-    # would want to create the initial label for the subroutine here
-    # but need to wait until we know how many locals there are
-    # so just keep track of where we'll put the label later
-    function_entry_index = len(writer)
 
     # '('
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
         raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
-
-    # branch.append_child(tokens_ref.value[0])
     tokens_ref.value = tokens_ref.value[1:]
 
     # parameterList
@@ -166,17 +146,28 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     # ')'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
         raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
-    # subroutineBody
-    if not compile_subroutine_body(tokens_ref, class_symbols, subroutine_symbols, writer):
-        raise ValueError(f"Invalid program. Expected subroutineBody, got {tokens_ref.value[0]}")
+    # '{'
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
+        raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
+    tokens_ref.value = tokens_ref.value[1:]
 
-    # now that we know how many locals there are, we can create the function label
+    # varDec*
+    while compile_var_dec(tokens_ref, subroutine_symbols):
+        ...
+
+    # now that we know how many locals there are, we can create the function entry label
     writer.write_function(f"{class_name}.{subroutine_name}", subroutine_symbols.var_count("local"))
-    function_entry = writer.pop()
-    writer.insert(function_entry_index, function_entry)
+
+    # statements
+    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
+        raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
+
+    # '}'
+    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
+        raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
+    tokens_ref.value = tokens_ref.value[1:]
 
     return True
 
@@ -190,14 +181,12 @@ def compile_parameter_list(tokens_ref: Ref[list[Token]], subroutine_symbols: Sym
     # type
     if not is_type(tokens_ref.value[0]):
         raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
-
     type = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
-
     name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
@@ -211,45 +200,16 @@ def compile_parameter_list(tokens_ref: Ref[list[Token]], subroutine_symbols: Sym
         # type
         if not is_type(tokens_ref.value[0]):
             raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
-
         type = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
         # varName
         if tokens_ref.value[0].type != "identifier":
             raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
-
         name = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
         subroutine_symbols.insert(name, type, "argument")
-
-    return True
-
-
-def compile_subroutine_body(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
-    """'{' varDec* statements '}'"""
-
-    # '{'
-    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
-        return False
-
-    tokens_ref.value = tokens_ref.value[1:]
-
-    # varDec*
-    while compile_var_dec(tokens_ref, subroutine_symbols):
-        ...
-
-    # statements
-    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
-        raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
-
-    # '}'
-    if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
-        pdb.set_trace()
-        raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
-
-    tokens_ref.value = tokens_ref.value[1:]
 
     return True
 
@@ -260,20 +220,17 @@ def compile_var_dec(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTabl
     # 'var'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "var":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # type
     if not is_type(tokens_ref.value[0]):
         raise ValueError(f"Invalid program. Expected type, got {tokens_ref.value[0]}")
-
     type = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
-
     name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
@@ -286,7 +243,6 @@ def compile_var_dec(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTabl
 
         if tokens_ref.value[0].type != "identifier":
             raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
-
         name = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -295,7 +251,6 @@ def compile_var_dec(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTabl
     # ';'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     return True
@@ -321,7 +276,6 @@ def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # 'do'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "do":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineCall
@@ -331,7 +285,6 @@ def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # ';'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # throw away the return value
@@ -346,13 +299,11 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
     # 'let'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "let":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # varName
     if tokens_ref.value[0].type != "identifier":
         raise ValueError(f"Invalid program. Expected varName, got {tokens_ref.value[0]}")
-
     var_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
@@ -373,7 +324,6 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
     # '='
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "=":
         raise ValueError(f"Invalid program. Expected '=', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
@@ -382,9 +332,7 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
 
     # ';'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
-        pdb.set_trace()
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     symbol = subroutine_symbols.get(var_name, None) or class_symbols.get(var_name, None)
@@ -408,7 +356,6 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     # 'while'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "while":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     global while_label_count
@@ -420,7 +367,6 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     # '('
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
         raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
@@ -430,7 +376,6 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     # ')'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
         raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     writer.write_arithmetic("not")
@@ -439,7 +384,6 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     # '{'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
         raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # statements
@@ -449,7 +393,6 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     # '}'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     writer.write_goto(L1)
@@ -464,7 +407,6 @@ def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, sub
     # 'return'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "return":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression?
@@ -477,7 +419,6 @@ def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, sub
     # ';'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     writer.write_return()
@@ -494,7 +435,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # 'if'
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value != "if":
         return False
-
     tokens_ref.value = tokens_ref.value[1:]
 
     global if_label_count
@@ -505,7 +445,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # '('
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
         raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
@@ -515,7 +454,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # ')'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
         raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     writer.write_arithmetic("not")
@@ -524,7 +462,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # '{'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
         raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     # statements
@@ -534,7 +471,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     # '}'
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
         raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
-
     tokens_ref.value = tokens_ref.value[1:]
 
     writer.write_goto(L2)
@@ -546,7 +482,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "{":
             raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
         if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
@@ -554,7 +489,6 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
             raise ValueError(f"Invalid program. Expected '}}', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
     writer.write_label(L2)
@@ -687,7 +621,6 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
         return True
@@ -740,7 +673,6 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
 
         if tokens_ref.value[0].type != "identifier":
             raise ValueError(f"Invalid program. Expected subroutineName, got {tokens_ref.value[0]}")
-
         method_name = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
@@ -755,14 +687,12 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "(":
             raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
         nArgs += compile_expression_list(tokens_ref, class_symbols, subroutine_symbols, writer)
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
         writer.write_call(call_label, nArgs)
