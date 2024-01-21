@@ -385,9 +385,9 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
     if symbol.kind == "field":
         pdb.set_trace()
         # TODO: need to anchor this to the correct address before we can use...
-        writer.write_push("this", symbol.index)
+        writer.write_pop("this", symbol.index)
     else:
-        writer.write_push(symbol.kind, symbol.index)
+        writer.write_pop(symbol.kind, symbol.index)
 
     return True
 
