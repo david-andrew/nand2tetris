@@ -116,12 +116,17 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     # ('constructor' | 'function' | 'method')
     if tokens_ref.value[0].type != "keyword" or tokens_ref.value[0].value not in ["constructor", "function", "method"]:
         return False
+    subroutine_type = tokens_ref.value[0].value
+    tokens_ref.value = tokens_ref.value[1:]
 
     # set up the symbol table for this subroutine
     subroutine_symbols = SymbolTable()
-    if tokens_ref.value[0].value == "method":
+
+    # if a method, add `this` as the first argument, and set the base address to `this` object
+    if subroutine_type == "method":
         subroutine_symbols.insert("this", class_name, "argument")
-    tokens_ref.value = tokens_ref.value[1:]
+        writer.write_push("argument", 0)
+        writer.write_pop("pointer", 0)
 
     # ('void' | type)
     if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].type != "keyword" and tokens_ref.value[0].value != "void":
@@ -337,9 +342,8 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
 
     symbol = subroutine_symbols.get(var_name, None) or class_symbols.get(var_name, None)
     assert symbol is not None, f"Variable {var_name} not found. Expected local or class variable."
+    # TODO: what about assigning to arrays?
     if symbol.kind == "field":
-        pdb.set_trace()
-        # TODO: need to anchor this to the correct address before we can use...
         writer.write_pop("this", symbol.index)
     else:
         writer.write_pop(symbol.kind, symbol.index)
@@ -587,8 +591,6 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
         elif tokens_ref.value[0].value == "null":
             writer.write_push("constant", 0)
         elif tokens_ref.value[0].value == "this":
-            pdb.set_trace()
-            # not sure if this is right
             writer.write_push("pointer", 0)
         else:
             raise ValueError(f"Invalid keyword: {tokens_ref.value[0].value}")
@@ -604,8 +606,6 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
         symbol = subroutine_symbols.get(name, None) or class_symbols.get(name, None)
         assert symbol is not None, f"Variable {name} not found. Expected local or class variable."
         if symbol.kind == "field":
-            pdb.set_trace()
-            # TODO: need to anchor this to the correct address before we can use...
             writer.write_push("this", symbol.index)
         else:
             writer.write_push(symbol.kind, symbol.index)
@@ -649,20 +649,24 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
 
     # subroutineName '(' expressionList ')'
     if tokens_ref.value[0].type == "identifier" and tokens_ref.value[1].type == "symbol" and tokens_ref.value[1].value == "(":
-        root.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
+        nArgs = 0
+        subroutine_name = tokens_ref.value[0].value
+        tokens_ref.value = tokens_ref.value[2:]
 
-        root.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
+        # push this as the first argument
+        writer.write_push("pointer", 0)
+        nArgs += 1
 
-        if not compile_expression_list(tokens_ref, root):
-            raise ValueError(f"Invalid program. Expected expressionList, got {tokens_ref.value[0]}")
+        # expressionList
+        nArgs += compile_expression_list(tokens_ref, class_symbols, subroutine_symbols, writer)
 
-        if tokens_ref.value[0].tag != "symbol" or tokens_ref.value[0].children != [")"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
-        root.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+
+        writer.write_call(f"{subroutine_name}", nArgs)
+
         return True
 
     # (className | varName) '.' subroutineName '(' expressionList ')'
@@ -681,7 +685,6 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
         parent_symbol = subroutine_symbols.get(parent_name, None) or class_symbols.get(parent_name, None)
         if parent_symbol is not None:
             writer.write_push(parent_symbol.kind, parent_symbol.index)
-            pdb.set_trace()
             call_label = f"{parent_symbol.type}.{method_name}"
             nArgs += 1
 
@@ -689,6 +692,7 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
             raise ValueError(f"Invalid program. Expected '(', got {tokens_ref.value[0]}")
         tokens_ref.value = tokens_ref.value[1:]
 
+        # expressionList
         nArgs += compile_expression_list(tokens_ref, class_symbols, subroutine_symbols, writer)
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
