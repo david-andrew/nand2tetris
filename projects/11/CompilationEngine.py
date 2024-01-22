@@ -312,19 +312,29 @@ def compile_let(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: Sy
     var_name = tokens_ref.value[0].value
     tokens_ref.value = tokens_ref.value[1:]
 
-    # ('[' expression ']')?
-    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == "[":
-        branch.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
+    # get the symbol associated with this variable
+    symbol = subroutine_symbols.get(var_name, None) or class_symbols.get(var_name, None)
+    assert symbol is not None, f"Variable {var_name} not found. Expected local or class variable."
 
-        if not compile_expression(tokens_ref, branch):
+    # ('[' expression ']')?
+    is_array_assignment = False
+    if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == "[":
+        tokens_ref.value = tokens_ref.value[1:]
+        is_array_assignment = True
+
+        # push the base address of the array
+        writer.write_push(symbol.kind, symbol.index)
+
+        if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "]":
             raise ValueError(f"Invalid program. Expected ']', got {tokens_ref.value[0]}")
 
-        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
+
+        # add the index to the base address
+        writer.write_arithmetic("add")
 
     # '='
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "=":
@@ -340,10 +350,12 @@ def compile_let(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: Sy
         raise ValueError(f"Invalid program. Expected ';', got {tokens_ref.value[0]}")
     tokens_ref.value = tokens_ref.value[1:]
 
-    symbol = subroutine_symbols.get(var_name, None) or class_symbols.get(var_name, None)
-    assert symbol is not None, f"Variable {var_name} not found. Expected local or class variable."
-    # TODO: what about assigning to arrays?
-    if symbol.kind == "field":
+    if is_array_assignment:
+        writer.write_pop("temp", 0)
+        writer.write_pop("pointer", 1)
+        writer.write_push("temp", 0)
+        writer.write_pop("that", 0)
+    elif symbol.kind == "field":
         writer.write_pop("this", symbol.index)
     else:
         writer.write_pop(symbol.kind, symbol.index)
@@ -544,22 +556,28 @@ def compile_term(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: S
 
     # varName '[' expression ']'   # needs to be before varName
     if tokens_ref.value[0].type == "identifier" and tokens_ref.value[1].type == "symbol" and tokens_ref.value[1].value == "[":
-        branch.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
+        var_name = tokens_ref.value[0].value
+        tokens_ref.value = tokens_ref.value[2:]
 
-        branch.append_child(tokens_ref.value[0])
-        tokens_ref.value = tokens_ref.value[1:]
+        # push the base address of the array
+        symbol = subroutine_symbols.get(var_name, None) or class_symbols.get(var_name, None)
+        assert symbol is not None, f"Variable {var_name} not found. Expected local or class variable."
+        writer.write_push(symbol.kind, symbol.index)
 
-        if not compile_expression(tokens_ref, branch):
+        if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
-        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].children != ["]"]:
+        if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "]":
             raise ValueError(f"Invalid program. Expected ']', got {tokens_ref.value[0]}")
-
-        branch.append_child(tokens_ref.value[0])
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(branch)
+        # add the index to the base address
+        writer.write_arithmetic("add")
+        writer.write_pop("pointer", 1)
+
+        # push the value of the array
+        writer.write_push("that", 0)
+
         return True
 
     # subroutineCall    # needs to be before varName
@@ -575,10 +593,15 @@ def compile_term(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: S
 
     # stringConstant
     if tokens_ref.value[0].type == "stringConstant":
-        branch.append_child(tokens_ref.value[0])
+        string = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        root.append_child(branch)
+        writer.write_push("constant", len(string))
+        writer.write_call("String.new", 1)
+        for char in string:
+            writer.write_push("constant", ord(char))
+            writer.write_call("String.appendChar", 2)
+
         return True
 
     # keywordConstant
