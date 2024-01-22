@@ -332,7 +332,6 @@ def compile_let(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: Sy
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "]":
             raise ValueError(f"Invalid program. Expected ']', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
         # add the index to the base address
@@ -687,7 +686,6 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_name: str, class
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
-
         tokens_ref.value = tokens_ref.value[1:]
 
         writer.write_call(f"{class_name}.{subroutine_name}", nArgs)
