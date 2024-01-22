@@ -118,6 +118,9 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     # set up the symbol table for this subroutine
     subroutine_symbols = SymbolTable()
 
+    if subroutine_type == "method":
+        subroutine_symbols.insert("this", class_name, "argument")
+
     # ('void' | type)
     if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].type != "keyword" and tokens_ref.value[0].value != "void":
         raise ValueError(f"Invalid program. Expected type or 'void', got {tokens_ref.value[0]}")
@@ -157,7 +160,6 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
 
     # if a method, add `this` as the first argument, and set the base address to `this` object
     if subroutine_type == "method":
-        subroutine_symbols.insert("this", class_name, "argument")
         writer.write_push("argument", 0)
         writer.write_pop("pointer", 0)
     elif subroutine_type == "constructor":
