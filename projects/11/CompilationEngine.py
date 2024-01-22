@@ -122,12 +122,6 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     # set up the symbol table for this subroutine
     subroutine_symbols = SymbolTable()
 
-    # if a method, add `this` as the first argument, and set the base address to `this` object
-    if subroutine_type == "method":
-        subroutine_symbols.insert("this", class_name, "argument")
-        writer.write_push("argument", 0)
-        writer.write_pop("pointer", 0)
-
     # ('void' | type)
     if not is_type(tokens_ref.value[0]) and tokens_ref.value[0].type != "keyword" and tokens_ref.value[0].value != "void":
         raise ValueError(f"Invalid program. Expected type or 'void', got {tokens_ref.value[0]}")
@@ -165,8 +159,18 @@ def compile_subroutine(tokens_ref: Ref[list[Token]], class_name: str, class_symb
     # now that we know how many locals there are, we can create the function entry label
     writer.write_function(f"{class_name}.{subroutine_name}", subroutine_symbols.var_count("local"))
 
+    # if a method, add `this` as the first argument, and set the base address to `this` object
+    if subroutine_type == "method":
+        subroutine_symbols.insert("this", class_name, "argument")
+        writer.write_push("argument", 0)
+        writer.write_pop("pointer", 0)
+    elif subroutine_type == "constructor":
+        writer.write_push("constant", class_symbols.var_count("field"))
+        writer.write_call("Memory.alloc", 1)
+        writer.write_pop("pointer", 0)
+
     # statements
-    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_statements(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
     # '}'
@@ -261,21 +265,21 @@ def compile_var_dec(tokens_ref: Ref[list[Token]], subroutine_symbols: SymbolTabl
     return True
 
 
-def compile_statements(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_statements(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """statement*"""
 
     # statement*
-    while compile_do(tokens_ref, class_symbols, subroutine_symbols, writer) or \
-            compile_let(tokens_ref, class_symbols, subroutine_symbols, writer) or \
-            compile_while(tokens_ref, class_symbols, subroutine_symbols, writer) or \
-            compile_return(tokens_ref, class_symbols, subroutine_symbols, writer) or \
-            compile_if(tokens_ref, class_symbols, subroutine_symbols, writer):
+    while compile_do(tokens_ref, class_name, class_symbols, subroutine_symbols, writer) or \
+            compile_let(tokens_ref, class_name, class_symbols, subroutine_symbols, writer) or \
+            compile_while(tokens_ref, class_name, class_symbols, subroutine_symbols, writer) or \
+            compile_return(tokens_ref, class_name, class_symbols, subroutine_symbols, writer) or \
+            compile_if(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         ...
 
     return True
 
 
-def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_do(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'do' subroutineCall ';'"""
 
     # 'do'
@@ -284,7 +288,7 @@ def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     tokens_ref.value = tokens_ref.value[1:]
 
     # subroutineCall
-    if not compile_subroutine_call(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_subroutine_call(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected subroutineCall, got {tokens_ref.value[0]}")
 
     # ';'
@@ -298,7 +302,7 @@ def compile_do(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     return True
 
 
-def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_let(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'let' varName ('[' expression ']')? '=' expression ';'"""
 
     # 'let'
@@ -332,7 +336,7 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
-    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ';'
@@ -354,7 +358,7 @@ def compile_let(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrou
 while_label_count = 0
 
 
-def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_while(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'while' '(' expression ')' '{' statements '}'"""
 
     # 'while'
@@ -374,7 +378,7 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
-    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ')'
@@ -391,7 +395,7 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     tokens_ref.value = tokens_ref.value[1:]
 
     # statements
-    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_statements(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
     # '}'
@@ -405,7 +409,7 @@ def compile_while(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subr
     return True
 
 
-def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_return(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'return' expression? ';'"""
 
     # 'return'
@@ -415,7 +419,7 @@ def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, sub
 
     # expression?
     if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ";":
-        if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+        if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
     else:
         writer.write_push("constant", 0)
@@ -433,7 +437,7 @@ def compile_return(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, sub
 if_label_count = 0
 
 
-def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_if(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?"""
 
     # 'if'
@@ -452,7 +456,7 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     tokens_ref.value = tokens_ref.value[1:]
 
     # expression
-    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
     # ')'
@@ -469,7 +473,7 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     tokens_ref.value = tokens_ref.value[1:]
 
     # statements
-    if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_statements(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
     # '}'
@@ -500,11 +504,11 @@ def compile_if(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subrout
     return True
 
 
-def compile_expression(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_expression(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """term (op term)*"""
 
     # term
-    if not compile_term(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_term(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         return False
 
     # (op term)*
@@ -512,7 +516,7 @@ def compile_expression(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable,
         operator = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_term(tokens_ref, class_symbols, subroutine_symbols, writer):
+        if not compile_term(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
 
         if operator == "+":
@@ -539,7 +543,7 @@ def compile_expression(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable,
     return True
 
 
-def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_term(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term"""
 
     # varName '[' expression ']'   # needs to be before varName
@@ -563,7 +567,7 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
         return True
 
     # subroutineCall    # needs to be before varName
-    if compile_subroutine_call(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if compile_subroutine_call(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         return True
 
     # integerConstant
@@ -616,7 +620,7 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
     if tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == "(":
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+        if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
@@ -630,7 +634,7 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
         operator = tokens_ref.value[0].value
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_term(tokens_ref, class_symbols, subroutine_symbols, writer):
+        if not compile_term(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected term, got {tokens_ref.value[0]}")
 
         if operator == "-":
@@ -644,7 +648,7 @@ def compile_term(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subro
     return False
 
 
-def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
+def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> bool:
     """subroutineName '(' expressionList ')' | (className | varName) '.' subroutineName '(' expressionList ')'"""
 
     # subroutineName '(' expressionList ')'
@@ -658,14 +662,14 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
         nArgs += 1
 
         # expressionList
-        nArgs += compile_expression_list(tokens_ref, class_symbols, subroutine_symbols, writer)
+        nArgs += compile_expression_list(tokens_ref, class_name, class_symbols, subroutine_symbols, writer)
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
 
         tokens_ref.value = tokens_ref.value[1:]
 
-        writer.write_call(f"{subroutine_name}", nArgs)
+        writer.write_call(f"{class_name}.{subroutine_name}", nArgs)
 
         return True
 
@@ -684,7 +688,10 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
 
         parent_symbol = subroutine_symbols.get(parent_name, None) or class_symbols.get(parent_name, None)
         if parent_symbol is not None:
-            writer.write_push(parent_symbol.kind, parent_symbol.index)
+            if parent_symbol.kind == "field":
+                writer.write_push("this", parent_symbol.index)
+            else:
+                writer.write_push(parent_symbol.kind, parent_symbol.index)
             call_label = f"{parent_symbol.type}.{method_name}"
             nArgs += 1
 
@@ -693,7 +700,7 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
         tokens_ref.value = tokens_ref.value[1:]
 
         # expressionList
-        nArgs += compile_expression_list(tokens_ref, class_symbols, subroutine_symbols, writer)
+        nArgs += compile_expression_list(tokens_ref, class_name, class_symbols, subroutine_symbols, writer)
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != ")":
             raise ValueError(f"Invalid program. Expected ')', got {tokens_ref.value[0]}")
@@ -706,7 +713,7 @@ def compile_subroutine_call(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
     return False
 
 
-def compile_expression_list(tokens_ref: Ref[list[Token]], class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> int:
+def compile_expression_list(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: SymbolTable, subroutine_symbols: SymbolTable, writer: VMWriter) -> int:
     """(expression (',' expression)*)?"""
     nArgs = 0
     # (expression (',' expression)*)?
@@ -714,7 +721,7 @@ def compile_expression_list(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
         return nArgs  # empty expression list
 
     # expression
-    if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+    if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
         raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
     nArgs += 1
 
@@ -722,7 +729,7 @@ def compile_expression_list(tokens_ref: Ref[list[Token]], class_symbols: SymbolT
     while tokens_ref.value[0].type == "symbol" and tokens_ref.value[0].value == ",":
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_expression(tokens_ref, class_symbols, subroutine_symbols, writer):
+        if not compile_expression(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected expression, got {tokens_ref.value[0]}")
 
         nArgs += 1
