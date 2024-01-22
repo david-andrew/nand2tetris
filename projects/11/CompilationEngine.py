@@ -7,10 +7,6 @@ from VMWriter import VMWriter
 import pdb
 
 
-# TODO: remove this eventually
-XML = None
-
-
 def compile(tokens: list[Token]) -> str:
     tokens_ref = Ref(tokens)
     writer = VMWriter()
