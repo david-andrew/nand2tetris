@@ -500,7 +500,7 @@ def compile_if(tokens_ref: Ref[list[Token]], class_name: str, class_symbols: Sym
             raise ValueError(f"Invalid program. Expected '{{', got {tokens_ref.value[0]}")
         tokens_ref.value = tokens_ref.value[1:]
 
-        if not compile_statements(tokens_ref, class_symbols, subroutine_symbols, writer):
+        if not compile_statements(tokens_ref, class_name, class_symbols, subroutine_symbols, writer):
             raise ValueError(f"Invalid program. Expected statements, got {tokens_ref.value[0]}")
 
         if tokens_ref.value[0].type != "symbol" or tokens_ref.value[0].value != "}":
