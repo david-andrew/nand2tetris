@@ -11,10 +11,18 @@
 class Memory {
 
     static Array memory; // the RAM array
+    static Array heap;   // the heap array
+    static int freeList; // the address of the first free block in the heap
 
     /** Initializes the class. */
     function void init() {
         let memory = 0; // set the address of the memory array to start at 0
+        let heap = 2048; // set the address of the heap array to start at 2048
+        freeList = 0; // set the address of the first free block in the heap to 0
+        
+        // set up the first block in the heap
+        let heap[freeList] = 14335;   //free space in this block (14336-1 for block size)
+        let heap[freeList+1] = 0;     //address of next block (null)
     }
 
     /** Returns the RAM value at the given address. */
@@ -30,10 +38,51 @@ class Memory {
     /** Finds an available RAM block of the given size and returns
      *  a reference to its base address. */
     function int alloc(int size) {
+        var int prevAddress, curAddress;
+        
+        let curAddress = freeList; // set the base address to the address of the first free block
+        
+        // search for the first available block that is large enough
+        while (curAddress != 0) {
+            if (heap[curAddress] = size) {
+
+                // remove this node from the linked list
+                if (curAddress = freeList) {
+                    let freeList = heap[curAddress+1];
+                } else {
+                    let heap[prevAddress+1] = heap[curAddress+1];
+                }
+
+                // return this node as the memory for use
+                return curAddress + 1;
+            }
+            if (heap[curAddress] > size) {
+                // split the current block into two blocks
+                let heap[curAddress + size + 1] = heap[curAddress] - (size + 1);    // set the size of the next block to be the current block size minus the requested memory
+                let heap[curAddress] = size;                                        // mark the current block as the size requested
+                
+                // remove this node from the linked list
+                if (curAddress = freeList) {
+                    let freeList = freeList + size + 1;
+                } else {
+                    let heap[prevAddress + 1] = curAddress + size + 1;
+                    let heap[curAddress + size + 2] = heap[curAddress + 1];
+                }
+
+                return curAddress + 1;
+            }
+
+            let prevAddress = curAddress;
+            let curAddress = heap[curAddress+1]; // set the base address to the address of the next block
+        }
+
+        return 0;
     }
 
     /** De-allocates the given object (cast as an array) by making
      *  it available for future allocations. */
     function void deAlloc(Array o) {
-    }    
+        let heap[o + 1] = freeList; // set the next block of the given block to the first free block
+        let freeList = o;
+    }
 }
