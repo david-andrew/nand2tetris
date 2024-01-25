@@ -51,6 +51,8 @@ class Math {
     function int multiply(int x, int y) {
         var int acc, i;
         var boolean pos;
+
+        // keep track of sign of result (not allowed to use multiplication here)
         let pos = (((x > 0) | (x = 0)) & ((y > 0) | (y = 0))) | ((x < 0) & (y < 0));
         let x = Math.abs(x);
         let y = Math.abs(y);
