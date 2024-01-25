@@ -54,11 +54,15 @@ class Memory {
         
         // search for the first available block that is large enough
         while (~(curAddress = 0)) {
+            
+            // current block is a perfect match
             if (heap[curAddress] = size) {
                 // remove this node from the linked list, and return it as the block for use
                 let heap[prevAddress+1] = heap[curAddress + 1];
                 return heap + curAddress + 1;
             }
+
+            // current block is larger than the requested size
             if (heap[curAddress] > size) {
         
                 // split the current block into two blocks
@@ -72,8 +76,9 @@ class Memory {
                 return heap + curAddress + 1;
             }
 
+            // current block is too small, so move on to the next block
             let prevAddress = curAddress;
-            let curAddress = heap[curAddress+1]; // set the base address to the address of the next block
+            let curAddress = heap[curAddress+1];
         }
 
         // no block was found
