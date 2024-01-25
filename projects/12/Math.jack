@@ -9,8 +9,30 @@
  */
 class Math {
 
+    static Array twoToThe;
+
     /** Initializes the library. */
     function void init() {
+        var int i;
+        let twoToThe = Array.new(16);
+        let twoToThe[0] = 1;
+        let i = 1;
+        while (i < 16) {
+            let twoToThe[i] = twoToThe[i-1] + twoToThe[i-1];
+            let i = i + 1;
+        }
+        return;
+    }
+
+    function boolean bit(int x, int n) {
+        return (x & twoToThe[n]) > 0;
+    }
+
+    function int sign(int x) {
+        if (x < 0) {
+            return -1;
+        }
+        return 1;
     }
 
     /** Returns the absolute value of x. */
@@ -27,6 +49,26 @@ class Math {
      *  the Jack expressions x*y and multiply(x,y) return the same value.
      */
     function int multiply(int x, int y) {
+        var int acc, i;
+        var boolean pos;
+        let pos = (((x > 0) | (x = 0)) & ((y > 0) | (y = 0))) | ((x < 0) & (y < 0));
+        let x = Math.abs(x);
+        let y = Math.abs(y);
+        
+        let acc = 0;
+        let i = 0;
+        while (i < 16) {
+            if (Math.bit(y, i)) {
+                let acc = acc + x;
+            }
+            let x = x + x;
+            let i = i + 1;
+        }
+        if (pos) {
+            return acc;
+        } else {
+            return -acc;
+        }
     }
 
     /** Returns the integer part of x/y.
@@ -35,10 +77,43 @@ class Math {
      *  the Jack expressions x/y and divide(x,y) return the same value.
      */
     function int divide(int x, int y) {
+        var int q, q2, sign;
+        
+        // error if try to divide by zero
+        if (y = 0) {
+            do Sys.error(1);
+        }
+
+        let sign = Math.sign(x) * Math.sign(y);
+        let x = Math.abs(x);
+        let y = Math.abs(y);
+
+        if ((y > x) | (y < 0)) {
+            return 0;
+        }
+        let q = Math.divide(x, y + y);
+        let q2 = q + q;
+        if ((x - (q2*y)) < y) {
+            return q2 * sign;
+        } else {
+            return (q2 + 1) * sign;
+        }
     }
 
     /** Returns the integer part of the square root of x. */
     function int sqrt(int x) {
+        var int i, y, test, test2;
+        let i = 8; // 2^(16/2). sqrt(2^16) = 2^8
+        let y = 0;
+        while ((i > 0) | (i = 0)) {
+            let test = y + twoToThe[i];
+            let test2 = test * test;
+            if (((test2 < x) | (test2 = x)) & (test2 > 0)) {
+                let y = test;
+            }
+            let i = i - 1;
+        }
+        return y;
     }
 
     /** Returns the greater number. */
