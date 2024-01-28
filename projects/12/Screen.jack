@@ -11,33 +11,199 @@
  */
 class Screen {
 
+    static boolean color;
+    static Array twoToThe;
+
     /** Initializes the Screen. */
     function void init() {
+        var int i;
+        let color = true;
+        let twoToThe = Array.new(16);
+        let twoToThe[0] = 1;
+        let i = 1;
+        while (i < 16) {
+            let twoToThe[i] = twoToThe[i-1] * 2;
+            let i = i + 1;
+        }
+        return;
     }
 
     /** Erases the entire screen. */
     function void clearScreen() {
+        var int i;
+        let i = 16384;
+        while (i < 24576) {
+            do Memory.poke(i, 0);
+            let i = i + 1;
+        }
+        return;
     }
 
     /** Sets the current color, to be used for all subsequent drawXXX commands.
      *  Black is represented by true, white by false. */
     function void setColor(boolean b) {
+        let color = b;
+        return;
     }
 
     /** Draws the (x,y) pixel, using the current color. */
     function void drawPixel(int x, int y) {
+        var int address, value, mod, mask;
+        let address = 16384 + y*32 + x/16;
+        let value = Memory.peek(address);
+        let mod = x-((x/16)*16);
+        let mask = twoToThe[15-mod];
+        if (color) {
+            let value = value | mask;
+        } else {
+            let value = value & ~mask;
+        }
+        do Memory.poke(address, value);
+        return;
     }
 
     /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
     function void drawLine(int x1, int y1, int x2, int y2) {
+        var int dx, dy, sx, sy, err, e2;
+
+        // vertical line
+        if (x1 = x2) {
+            let dy = y2 - y1;
+            if (dy > 0) {
+                let dy = 1;
+            } else {
+                let dy = -1;
+            }
+            while (~(y2 = y1)) {
+                do drawPixel(x1, y1);
+                let y1 = y1 + dy;  
+            }
+            return;
+        }
+
+        // horizontal line
+        if (y1 = y2) {
+            let dx = x2 - x1;
+            if (dx > 0) {
+                let dx = 1;
+            } else {
+                let dx = -1;
+            }
+            while (~(x2 = x1)) {
+                do drawPixel(x1, y1);
+                let x1 = x1 + dx;  
+            }
+            return;
+        }
+
+
+        // general line (Bresenham's algorithm)
+        if (x1 < x2) {
+            let sx = 1;
+            let dx = x2 - x1;
+        } else {
+            let sx = -1;
+            let dx = x1 - x2;
+        }
+        if (y1 < y2) {
+            let sy = 1;
+            let dy = y1 - y2;
+        } else {
+            let sy = -1;
+            let dy = y2 - y1;
+        }
+        let err = dx + dy;
+
+        while (true) {
+            do drawPixel(x1, y1);
+            if ((x1 = x2) & (y1 = y2)) {
+                return;
+            }
+            let e2 = 2*err;
+            if ((e2 > dy) | (e2 = dy)) {
+                if (x1 = x2) {
+                    return;
+                }
+                let err = err + dy;
+                let x1 = x1 + sx;
+            }
+            if ((e2 < dx) | (ex = dx)) {
+                if (y1 = y2) {
+                    return;
+                }
+                let err = err + dx;
+                let y1 = y1 + sy;
+            }
+        }
+        return;
     }
 
     /** Draws a filled rectangle whose top left corner is (x1, y1)
      * and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
+        while (~(y2 = y1)) {
+            do drawLine(x1, y1, x2, y1);
+            let y1 = y1 + 1;
+        }
+        return;
     }
 
     /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
-    function void drawCircle(int x, int y, int r) {
+    function void drawCircle(int xc, int yc, int r) {
+        // Midpoint circle algorithm
+        var int x, y, d, xmy;
+        let x = 0;
+        let y = r;
+        let d = 3 - (r+r);
+        do drawLine(xc, yc-y, xc, yc+y);
+        do drawLine(xc-y, yc, xc+y, yc);
+        while ((y > x) | (y = x)) {
+            let x = x + 1;
+            if (d > 0) {
+                let y = y - 1;
+                let xmy = x - y;
+                let d = d + xmy + xmy + xmy + xmy + 10;
+            } else {
+                let d = d + x + x + x + x + 6;
+            }
+            do drawLine(xc-x, yc+y, xc+x, yc+y);
+            do drawLine(xc-x, yc-y, xc+x, yc-y);
+            do drawLine(xc-y, yc+x, xc+y, yc+x);
+            do drawLine(xc-y, yc-x, xc+y, yc-x);
+        }
+        return;
+    }
+
+    function void outlineCircle(int xc, int yc, int r) {
+        // Midpoint circle algorithm
+        var int x, y, d, xmy;
+        let x = 0;
+        let y = r;
+        let d = 3 - (r+r);
+
+        do drawPixel(xc, yc+y);
+        do drawPixel(xc, yc-y);
+        do drawPixel(xc+y, yc);
+        do drawPixel(xc-y, yc);
+        
+        while ((y > x) | (y = x)) {
+            let x = x + 1;
+            if (d > 0) {
+                let y = y - 1;
+                let xmy = x - y;
+                let d = d + xmy + xmy + xmy + xmy + 10;
+            } else {
+                let d = d + x + x + x + x + 6;
+            }
+            do drawPixel(xc+x, yc+y);
+            do drawPixel(xc-x, yc+y);
+            do drawPixel(xc+x, yc-y);
+            do drawPixel(xc-x, yc-y);
+            do drawPixel(xc+y, yc+x);
+            do drawPixel(xc-y, yc+x);
+            do drawPixel(xc+y, yc-x);
+            do drawPixel(xc-y, yc-x);
+        }
+        return;
     }
 }
