@@ -13,11 +13,14 @@ class Screen {
 
     static boolean color;
     static Array twoToThe;
+    static Array xdiv16lookup;
+    static Array ymul32lookup;
     static Array screen;
+    
 
     /** Initializes the Screen. */
     function void init() {
-        var int i;
+        var int i, j;
         
         let screen = 16384; // manually set address of screen array so we can manage the memory 
         let color = true;   // initial color is black
@@ -29,7 +32,27 @@ class Screen {
             let twoToThe[i] = twoToThe[i-1] + twoToThe[i-1];
             let i = i + 1;
         }
-        
+
+        // precompute x/16 so that drawing pixels is faster
+        let xdiv16lookup = Array.new(512);
+        let i = 0;
+        while (i < 32) {
+            let j = 0;
+            while (j < 16) {
+                let xdiv16lookup[i*16+j] = i;
+                let j = j + 1;
+            }
+            let i = i + 1;
+        }
+
+        // precompute y*32 so that drawing pixels is faster
+        let ymul32lookup = Array.new(256);
+        let i = 0;
+        while (i < 256) {
+            let ymul32lookup[i] = i * 32;
+            let i = i + 1;
+        }
+
         return;
     }
 
@@ -51,11 +74,12 @@ class Screen {
         return;
     }
 
+
     /** Draws the (x,y) pixel, using the current color. */
     function void drawPixel(int x, int y) {
         var int address, value, mod, mask;
 
-        let address = (y*32) + (x/16);
+        let address = ymul32lookup[y] + xdiv16lookup[x]; // y*32 + x/16
         let value = screen[address];
         let mod = x & 15;
         let mask = twoToThe[mod];
