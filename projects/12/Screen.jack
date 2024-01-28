@@ -18,8 +18,10 @@ class Screen {
     /** Initializes the Screen. */
     function void init() {
         var int i;
-        let screen = 16384;
-        let color = true;
+        
+        let screen = 16384; // manually set address of screen array so we can manage the memory 
+        let color = true;   // initial color is black
+        
         let twoToThe = Array.new(16);
         let twoToThe[0] = 1;
         let i = 1;
@@ -27,6 +29,7 @@ class Screen {
             let twoToThe[i] = twoToThe[i-1] + twoToThe[i-1];
             let i = i + 1;
         }
+        
         return;
     }
 
