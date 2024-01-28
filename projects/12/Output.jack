@@ -275,7 +275,7 @@ class Output {
      *  and advances the cursor appropriately. */
     function void printInt(int i) {
         var int d, j;
-        var Array s;
+        var String s;
 
         // handle negative numbers
         if (i < 0) {
@@ -283,22 +283,9 @@ class Output {
             do Output.printChar(45);
         }
 
-        let s = Array.new(6);
-
-        // save value into the string
-        let j = 0;
-        while (i > 0) {
-            let d = i - ((i/10)*10); //i % 10;
-            let i = i / 10;
-            let s[j] = d + 48;
-            let j = j + 1;
-        }
-
-        // print the string
-        while (j > 0) {
-            let j = j - 1;
-            do Output.printChar(s[j]);
-        }
+        let s = String.new(6);
+        do s.setInt(i);
+        do Output.printString(s);
 
         return;
     }
