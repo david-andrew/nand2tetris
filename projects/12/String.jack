@@ -12,53 +12,119 @@
  */
 class String {
 
+    field Array str;
+    field int len;
+
     /** constructs a new empty string with a maximum length of maxLength
      *  and initial length of 0. */
     constructor String new(int maxLength) {
+        let str = Array.new(maxLength);
+        let len = 0;
+        return this;
     }
 
     /** Disposes this string. */
     method void dispose() {
+        do str.dispose();
+        do Memory.deAlloc(this);
+        return;
     }
 
     /** Returns the current length of this string. */
     method int length() {
+        return len;
     }
 
     /** Returns the character at the j-th location of this string. */
     method char charAt(int j) {
+        return str[j];
     }
 
     /** Sets the character at the j-th location of this string to c. */
     method void setCharAt(int j, char c) {
+        let str[j] = c;
+        return;
     }
 
     /** Appends c to this string's end and returns this string. */
     method String appendChar(char c) {
+        let str[len] = c;
+        let len = len + 1;
+        return this;
     }
 
     /** Erases the last character from this string. */
     method void eraseLastChar() {
+        let len = len - 1;
+        return;
     }
 
     /** Returns the integer value of this string, 
      *  until a non-digit character is detected. */
     method int intValue() {
+        var int val, i;
+        var boolean neg;
+        let val = 0;
+
+        let i = 0;
+        if (charAt(i) = 45) {
+            let neg = true;
+            let i = i + 1;
+        }
+
+        while (i < length()) {
+            let val = val * 10;
+            let val = val + charAt(i) - 48;
+        }
+
+        if (neg) {
+            let val = val * -1;
+        }
+
+        return val;
     }
 
     /** Sets this string to hold a representation of the given value. */
     method void setInt(int val) {
+        var Array s;
+        var int i, j, d;
+        let s = Array.new(6);
+
+        // save value into the string
+        let j = 0;
+        while (val > 0) {
+            let d = val - ((val/10)*10); //val % 10;
+            let val = val / 10;
+            let s[j] = d + 48;
+            let j = j + 1;
+        }
+
+        // print the string
+        let i = 0;
+        while (j > 0) {
+            let j = j - 1;
+            do setCharAt(i, s[j]);
+            let i = i + 1;
+        }
+
+        // set the length
+        let len = i;
+
+        return;
     }
 
     /** Returns the new line character. */
     function char newLine() {
+        return 128;
     }
 
     /** Returns the backspace character. */
     function char backSpace() {
+        return 129;
     }
 
     /** Returns the double quote (") character. */
     function char doubleQuote() {
+        return 34;
     }
 }
