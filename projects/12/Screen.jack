@@ -16,11 +16,10 @@ class Screen {
     static Array xdiv16lookup;
     static Array ymul32lookup;
     static Array screen;
-    
 
     /** Initializes the Screen. */
     function void init() {
-        var int i, j;
+        var int i;
         
         let screen = 16384; // manually set address of screen array so we can manage the memory 
         let color = true;   // initial color is black
@@ -36,12 +35,8 @@ class Screen {
         // precompute x/16 so that drawing pixels is faster
         let xdiv16lookup = Array.new(512);
         let i = 0;
-        while (i < 32) {
-            let j = 0;
-            while (j < 16) {
-                let xdiv16lookup[i*16+j] = i;
-                let j = j + 1;
-            }
+        while (i < 512) {
+            let xdiv16lookup[i] = i / 16;
             let i = i + 1;
         }
 
@@ -108,6 +103,7 @@ class Screen {
                 do Screen.drawPixel(x1, y1);
                 let y1 = y1 + dy;  
             }
+            do Screen.drawPixel(x1, y1);
             return;
         }
 
@@ -123,6 +119,7 @@ class Screen {
                 do Screen.drawPixel(x1, y1);
                 let x1 = x1 + dx;  
             }
+            do Screen.drawPixel(x1, y1);
             return;
         }
 
