@@ -13,16 +13,18 @@ class Screen {
 
     static boolean color;
     static Array twoToThe;
+    static Array screen;
 
     /** Initializes the Screen. */
     function void init() {
         var int i;
+        let screen = 16384;
         let color = true;
         let twoToThe = Array.new(16);
         let twoToThe[0] = 1;
         let i = 1;
         while (i < 16) {
-            let twoToThe[i] = twoToThe[i-1] * 2;
+            let twoToThe[i] = twoToThe[i-1] + twoToThe[i-1];
             let i = i + 1;
         }
         return;
@@ -31,9 +33,9 @@ class Screen {
     /** Erases the entire screen. */
     function void clearScreen() {
         var int i;
-        let i = 16384;
-        while (i < 24576) {
-            do Memory.poke(i, 0);
+        let i = 0;
+        while (i < 8192) {
+            let screen[i] = 0;
             let i = i + 1;
         }
         return;
@@ -49,16 +51,17 @@ class Screen {
     /** Draws the (x,y) pixel, using the current color. */
     function void drawPixel(int x, int y) {
         var int address, value, mod, mask;
-        let address = 16384 + y*32 + x/16;
-        let value = Memory.peek(address);
-        let mod = x-((x/16)*16);
-        let mask = twoToThe[15-mod];
+
+        let address = (y*32) + (x/16);
+        let value = screen[address];
+        let mod = x & 15;
+        let mask = twoToThe[mod];
         if (color) {
             let value = value | mask;
         } else {
             let value = value & ~mask;
         }
-        do Memory.poke(address, value);
+        let screen[address] = value;
         return;
     }
 
@@ -75,7 +78,7 @@ class Screen {
                 let dy = -1;
             }
             while (~(y2 = y1)) {
-                do drawPixel(x1, y1);
+                do Screen.drawPixel(x1, y1);
                 let y1 = y1 + dy;  
             }
             return;
@@ -90,7 +93,7 @@ class Screen {
                 let dx = -1;
             }
             while (~(x2 = x1)) {
-                do drawPixel(x1, y1);
+                do Screen.drawPixel(x1, y1);
                 let x1 = x1 + dx;  
             }
             return;
@@ -115,7 +118,7 @@ class Screen {
         let err = dx + dy;
 
         while (true) {
-            do drawPixel(x1, y1);
+            do Screen.drawPixel(x1, y1);
             if ((x1 = x2) & (y1 = y2)) {
                 return;
             }
@@ -127,7 +130,7 @@ class Screen {
                 let err = err + dy;
                 let x1 = x1 + sx;
             }
-            if ((e2 < dx) | (ex = dx)) {
+            if ((e2 < dx) | (e2 = dx)) {
                 if (y1 = y2) {
                     return;
                 }
@@ -142,7 +145,7 @@ class Screen {
      * and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
         while (~(y2 = y1)) {
-            do drawLine(x1, y1, x2, y1);
+            do Screen.drawLine(x1, y1, x2, y1);
             let y1 = y1 + 1;
         }
         return;
@@ -155,8 +158,8 @@ class Screen {
         let x = 0;
         let y = r;
         let d = 3 - (r+r);
-        do drawLine(xc, yc-y, xc, yc+y);
-        do drawLine(xc-y, yc, xc+y, yc);
+        do Screen.drawLine(xc, yc-y, xc, yc+y);
+        do Screen.drawLine(xc-y, yc, xc+y, yc);
         while ((y > x) | (y = x)) {
             let x = x + 1;
             if (d > 0) {
@@ -166,10 +169,10 @@ class Screen {
             } else {
                 let d = d + x + x + x + x + 6;
             }
-            do drawLine(xc-x, yc+y, xc+x, yc+y);
-            do drawLine(xc-x, yc-y, xc+x, yc-y);
-            do drawLine(xc-y, yc+x, xc+y, yc+x);
-            do drawLine(xc-y, yc-x, xc+y, yc-x);
+            do Screen.drawLine(xc-x, yc+y, xc+x, yc+y);
+            do Screen.drawLine(xc-x, yc-y, xc+x, yc-y);
+            do Screen.drawLine(xc-y, yc+x, xc+y, yc+x);
+            do Screen.drawLine(xc-y, yc-x, xc+y, yc-x);
         }
         return;
     }
@@ -181,10 +184,10 @@ class Screen {
         let y = r;
         let d = 3 - (r+r);
 
-        do drawPixel(xc, yc+y);
-        do drawPixel(xc, yc-y);
-        do drawPixel(xc+y, yc);
-        do drawPixel(xc-y, yc);
+        do Screen.drawPixel(xc, yc+y);
+        do Screen.drawPixel(xc, yc-y);
+        do Screen.drawPixel(xc+y, yc);
+        do Screen.drawPixel(xc-y, yc);
         
         while ((y > x) | (y = x)) {
             let x = x + 1;
@@ -195,14 +198,14 @@ class Screen {
             } else {
                 let d = d + x + x + x + x + 6;
             }
-            do drawPixel(xc+x, yc+y);
-            do drawPixel(xc-x, yc+y);
-            do drawPixel(xc+x, yc-y);
-            do drawPixel(xc-x, yc-y);
-            do drawPixel(xc+y, yc+x);
-            do drawPixel(xc-y, yc+x);
-            do drawPixel(xc+y, yc-x);
-            do drawPixel(xc-y, yc-x);
+            do Screen.drawPixel(xc+x, yc+y);
+            do Screen.drawPixel(xc-x, yc+y);
+            do Screen.drawPixel(xc+x, yc-y);
+            do Screen.drawPixel(xc-x, yc-y);
+            do Screen.drawPixel(xc+y, yc+x);
+            do Screen.drawPixel(xc-y, yc+x);
+            do Screen.drawPixel(xc+y, yc-x);
+            do Screen.drawPixel(xc-y, yc-x);
         }
         return;
     }
