@@ -263,9 +263,9 @@ class Output {
     function void printString(String s) {
         var int i, len;
         let i = 0;
-        let len = String.length(s);
+        let len = s.length();
         while (i < len) {
-            do Output.printChar(String.charAt(s, i));
+            do Output.printChar(s.charAt(i));
             let i = i + 1;
         }
         return;
