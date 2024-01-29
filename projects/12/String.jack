@@ -18,6 +18,9 @@ class String {
     /** constructs a new empty string with a maximum length of maxLength
      *  and initial length of 0. */
     constructor String new(int maxLength) {
+        if (maxLength < 1) {
+            let maxLength = 1;
+        }
         let str = Array.new(maxLength);
         let len = 0;
         return this;
@@ -67,16 +70,20 @@ class String {
         let val = 0;
 
         let i = 0;
+        // check if string starts with a negative sign
         if (charAt(i) = 45) {
             let neg = true;
             let i = i + 1;
         }
 
+        // convert the string to an int
         while (i < length()) {
             let val = val * 10;
             let val = val + charAt(i) - 48;
+            let i = i + 1;
         }
 
+        // handle if val is negative
         if (neg) {
             let val = val * -1;
         }
@@ -88,7 +95,17 @@ class String {
     method void setInt(int val) {
         var Array s;
         var int i, j, d;
+        var boolean neg;
         let s = Array.new(6);
+
+
+        // handle if val is negative
+        if (val < 0) {
+            let neg = true;
+            let val = val * -1;
+        } else {
+            let neg = false;
+        }
 
         // save value into the string
         let j = 0;
@@ -99,7 +116,13 @@ class String {
             let j = j + 1;
         }
 
-        // print the string
+        // save the negative sign
+        if (neg) {
+            let s[j] = 45;
+            let j = j + 1;
+        }
+
+        // save the chars into the string
         let i = 0;
         while (j > 0) {
             let j = j - 1;
