@@ -8,8 +8,12 @@
  */
 class Keyboard {
 
+    static Array buffer; 
+
     /** Initializes the keyboard. */
     function void init() {
+        let buffer = 24576;
+        return;
     } 
 
     /**
@@ -33,6 +37,7 @@ class Keyboard {
      * F1 - F12 = 141 - 152
      */
     function char keyPressed() {
+        return buffer[0];
     }
 
     /**								
@@ -41,6 +46,55 @@ class Keyboard {
      * of the pressed key.
      */
     function char readChar() {
+        var char c, tmp, i;
+        var boolean cursor;
+        let c = 0;
+        let i = 0;
+        let cursor = true;
+
+        // make space for the cursor
+        do Output.printChar(32);
+
+        // wait till a (printable) key is pressed
+        while (c = 0) {
+            let c = Keyboard.keyPressed();
+
+            // draw blinking cursor
+            let i = i + 1;
+            if (i = 0) {
+                do Output.backSpace();
+                if (cursor)  {
+                    do Output.printChar(32); // space
+                } else {
+                    do Output.printChar(95); // underscore
+                }
+                let cursor = ~cursor;
+            }
+        }
+
+        // wait till the key is released
+        let tmp = c;
+        while (tmp = c) {
+            let tmp = Keyboard.keyPressed();
+        }
+
+        // backspace to remove the cursor, 
+        do Output.backSpace();
+
+        // print the letter if printable
+        if ((c > 31) & (c < 127)) {
+            do Output.printChar(c);
+        }
+        // else handle newline
+        if (c = 128) {
+            do Output.println();
+        }
+        // else handle backspace
+        if (c = 129) {
+            do Output.backSpace();
+        }
+        
+        return c;
     }
 
     /**								
@@ -49,6 +103,32 @@ class Keyboard {
      * and returns its value. Also handles user backspaces.
      */
     function String readLine(String message) {
+        var char c;
+        var String s;
+
+        // print the message
+        do Output.printString(message);
+
+        let s = String.new(256); // max input length is 256
+
+        // read the line
+        let c = Keyboard.readChar();
+        while (~(c = 128)) {  // while not newline
+            // save the letter if printable
+            if ((c > 31) & (c < 127)) {
+                do s.appendChar(c);
+            }
+
+            // else handle backspace
+            if (c = 129) {
+                do s.eraseLastChar();
+            }
+           
+            // read the next character
+            let c = Keyboard.readChar();
+        }
+
+        return s;
     }   
 
     /**								
@@ -58,5 +138,36 @@ class Keyboard {
      * entered text is detected). Also handles user backspaces. 
      */
     function int readInt(String message) {
+        var char c;
+        var int num;
+        var boolean neg;
+
+        // print the message
+        do Output.printString(message);
+
+        // check if first character is a minus sign
+        let c = Keyboard.readChar();
+        if (c = 45) {
+            let neg = true;
+            let num = 0;
+        } else {
+            let neg = false;
+            let num = (c - 48);
+        }
+
+        // read the rest of the number
+        while (~(c = 128)) {
+            let c = Keyboard.readChar();
+            if ((c > 47) & (c < 58)) {
+                let num = (num * 10) + (c - 48);
+            }
+        }
+
+        // apply the minus sign if needed
+        if (neg) {
+            let num = -num;
+        }
+
+        return num;
     }
 }
